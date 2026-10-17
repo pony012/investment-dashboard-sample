@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portafolio GBM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Portafolio GBM</h1>
+      <div class="sub" id="subtitle">—</div>
+    </div>
+    <div class="actions">
+      <button id="eye" class="icon-btn" title="Ocultar montos" aria-pressed="false"></button>
+      <button id="collapseAll">Colapsar todo</button>
+      <button id="theme" title="Cambiar tema">Tema: auto</button>
+    </div>
+  </header>
+  <div class="demo-banner" id="demoBanner" hidden>Datos <b>sintéticos</b> de demostración: no corresponden a ninguna persona. Genera el tuyo con <code>uv run gbm all</code>.</div>
+
+  <div class="filters">
+    <label>Desde <select id="from"></select></label>
+    <label>Hasta <select id="to"></select></label>
+    <div class="seg" id="presets">
+      <button data-period="all">Todo</button>
+      <button data-period="ytd">Este año</button>
+      <button data-period="12">Últimos 12 m</button>
+      <button data-period="36">Últimos 36 m</button>
+    </div>
+    <label>Agrupar por <select id="dim"></select></label>
+    <label><input type="checkbox" id="incDiv"> Incluir dividendos en los rendimientos</label>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+  <details class="dq" id="dq" hidden><summary id="dqSummary"></summary><ul class="warn-list" id="dqList"></ul></details>
+
+  <section>
+    <h2>Insights</h2>
+    <p class="lede">Lecturas automáticas del periodo seleccionado. Cambian con el filtro de fechas, la casilla de dividendos y la clasificación de la tabla de instrumentos.</p>
+    <div class="insights" id="insights"></div>
+  </section>
+
+  <section>
+    <h2>Evolución del portafolio</h2>
+    <p class="lede">Valor al cierre de cada mes contra lo que has aportado neto (depósitos − retiros). El índice (base 100) encadena los rendimientos mensuales, así que no se distorsiona por tus depósitos o retiros: es la comparación justa entre tipos de inversión.</p>
+    <div class="card">
+      <div class="card-head">
+        <div><h3 id="evoTitle">Valor vs. aportado</h3><p class="hint" id="evoHint"></p></div>
+        <div class="actions">
+          <div class="seg" id="evoMode">
+            <button data-value="valor">Valor vs. aportado</button>
+            <button data-value="indice">Índice base 100</button>
+            <button data-value="rend">Rendimiento por periodo</button>
+          </div>
+          <div class="seg" id="evoGran"><button data-value="m">Mes</button><button data-value="q">Trimestre</button><button data-value="y">Año</button></div>
+        </div>
+      </div>
+      <div class="lg" id="lgEvo"></div>
+      <div class="chart tall" id="cEvo"></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card">
+        <div class="card-head"><div><h3>¿De dónde vino el crecimiento?</h3><p class="hint" id="growthHint">Ahorro neto (depósitos − retiros) vs. rendimientos</p></div></div>
+        <div class="chart" id="cGrowth"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Año por año</h3><p class="hint">Rendimiento ponderado por tiempo (TWR) calculado y el que reporta GBM</p></div></div>
+        <div class="tablewrap" style="border:0"><table id="yearTbl"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Composición</h2>
+    <p class="lede">Qué peso ha tenido cada tipo de inversión a lo largo del tiempo. Usa “Agrupar por” para cambiar entre tipo, clase de activo, región, riesgo o moneda.</p>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Peso a lo largo del tiempo</h3><p class="hint" id="compHint"></p></div>
+          <div class="actions"><div class="seg" id="compBy"><button data-value="grupo">Agrupado</button><button data-value="inst">Instrumentos</button></div>
+          <div class="seg" id="compMode"><button data-value="pct">%</button><button data-value="abs">$</button></div></div>
+        </div>
+        <div class="lg" id="lgComp"></div>
+        <div class="chart tall" id="cComp"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Al cierre del periodo</h3><p class="hint" id="donutHint"></p></div></div>
+        <div class="chart" id="cDonut" style="height:240px"></div>
+        <div class="dlist" id="donutList"></div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Jerarquía (sunburst)</h3><p class="hint" id="sunHint">Anillo interior → medio → instrumento</p></div>
+          <div class="actions"><select id="sb1"></select><select id="sb2"></select></div>
+        </div>
+        <div class="chart tall" id="cSun"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Mapa del portafolio</h3><p class="hint">Tamaño = valor al cierre · color = rendimiento</p></div>
+          <div class="seg" id="tmMetric"><button data-value="last">Último mes</button><button data-value="ann">Anualizado</button></div>
+        </div>
+        <div class="chart tall" id="cTree"></div>
+        <div class="legend-ramp" id="tmLegend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rendimiento por instrumento</h2>
+    <p class="lede"><b id="retBasis" style="font-weight:600"></b> Rendimiento ponderado por tiempo (Modified Dietz por mes, encadenado). El efectivo y el reporto no entran en el ranking. Los instrumentos con menos de 12 meses aparecen atenuados: su anualizado es poco confiable.</p>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Ranking</h3><p class="hint" id="rankHint"></p></div>
+          <div class="seg" id="rankMetric">
+            <button data-value="ann">Anualizado</button><button data-value="gain">Ganancia $</button><button data-value="eff">Eficiencia</button>
+          </div>
+        </div>
+        <div class="chart" id="cRank"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Riesgo vs. rendimiento</h3><p class="hint">Volatilidad anualizada (eje X) vs. rendimiento anualizado (eje Y). Tamaño = valor al cierre. Arriba a la izquierda es mejor.</p></div></div>
+        <div class="chart" id="cScatter"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head">
+        <div><h3>Mapa de calor</h3><p class="hint" id="heatHint"></p></div>
+        <div class="actions"><div class="legend-ramp" id="heatLegend"></div>
+          <div class="seg" id="heatGran"><button data-value="m">Mes</button><button data-value="q">Trimestre</button><button data-value="y">Año</button></div></div>
+      </div>
+      <div class="chart" id="cHeat"></div>
+    </div>
+  </section>
+
+  <section id="divSection">
+    <h2>Dividendos, distribuciones e impuestos</h2>
+    <p class="lede">De tus estados de cuenta (<span id="divCoverage"></span>): dividendos de ETFs y acciones, distribuciones de FIBRAs (resultado fiscal y reembolso de capital), ISR retenido y comisiones. El yield se calcula sobre el valor de mercado que tenías invertido en cada mes.</p>
+    <div class="kpis" id="divKpis"></div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Distribuciones recibidas</h3><p class="hint">Bruto por tipo (arriba) e ISR retenido (abajo). La línea es el neto.</p></div>
+          <div class="seg" id="divGran"><button data-value="m">Mes</button><button data-value="q">Trimestre</button><button data-value="y">Año</button></div>
+        </div>
+        <div class="lg" id="lgDiv"></div>
+        <div class="chart" id="cDiv"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Yield de los últimos 12 meses</h3><p class="hint">Distribuciones de 12 meses ÷ valor promedio invertido</p></div></div>
+        <div class="chart" id="cTTM"></div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Por instrumento</h3><p class="hint" id="divTkHint"></p></div>
+          <div class="seg" id="divMetric"><button data-value="yield">Yield neto anual</button><button data-value="net">$ neto</button></div>
+        </div>
+        <div class="chart" id="cDivTk"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Calendario de pagos</h3><p class="hint" id="calHint"></p></div>
+          <div class="seg" id="calGran"><button data-value="m">Mes</button><button data-value="q">Trimestre</button><button data-value="y">Año</button></div></div>
+        <div class="chart" id="cDivCal"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head"><div><h3>¿Quién paga y cada cuándo?</h3><p class="hint" id="freqHint"></p></div></div>
+      <div class="tablewrap" style="border:0"><table id="freqTbl"></table></div>
+      <p class="note">Frecuencia observada = cuántos meses distintos te pagó cada instrumento en los últimos 12 meses (≥ 9 mensual, 3–5 trimestral, 2 semestral, 1 anual; otro patrón, irregular). Los cuadros marcan en qué meses del año pagó en los últimos 24 meses. Si un instrumento lleva menos de 12 meses contigo se usa el calendario importado con “Completar con IA”; sin él, aparece como “pocos datos”.</p>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card">
+        <div class="card-head"><div><h3>Rendimiento mensual que reporta GBM</h3><p class="hint">Rendimiento global neto de la cuenta (incluye dividendos y comisiones) e índice acumulado. Incluye meses anteriores al primer estado de cuenta descargado.</p></div></div>
+        <div class="chart" id="cGbmRet"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Costos e impuestos por año</h3><p class="hint">Comisiones + IVA (en compras/ventas y cargos administrativos) e ISR retenido sobre distribuciones</p></div></div>
+        <div class="chart" id="cCosts"></div>
+        <p class="note" id="costNote"></p>
+      </div>
+    </div>
+    <div class="tablewrap" style="margin-top:12px"><table id="divTbl"></table></div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head"><div><h3>Próximas distribuciones (estimadas)</h3><p class="hint" id="nextHint"></p></div></div>
+      <div class="kpis" id="nextKpis"></div>
+      <div class="tablewrap"><table id="nextTbl"></table></div>
+      <p class="note">Estimación: cada instrumento repite los meses en que pagó en los últimos 12 meses; el monto es el neto (después de ISR) de ese mismo mes del año anterior, ajustado por cuánto creció tu posición. Los instrumentos que aún no te han pagado usan su calendario de pagos (de “Completar con IA” o de <code>private/instruments.json</code>): valor actual × yield aproximado ÷ pagos al año, menos 10% de ISR en el SIC. Los montos y fechas reales los anuncia cada emisora.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Flujos: a dónde metiste y de dónde sacaste</h2>
+    <p class="lede">Depósitos y retiros de efectivo de la cuenta, y compras (positivo) y ventas (negativo) de cada instrumento. Las compras incluyen comisión e IVA.</p>
+    <div class="kpis" id="flowKpis"></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><div><h3>Compras y ventas por periodo</h3><p class="hint" id="flowHint"></p></div>
+          <div class="actions"><div class="seg" id="flowBy"><button data-value="grupo">Agrupado</button><button data-value="inst">Instrumentos</button></div>
+          <div class="seg" id="flowGran"><button data-value="m">Mes</button><button data-value="q">Trimestre</button><button data-value="y">Año</button></div></div></div>
+        <div class="lg" id="lgFlows"></div>
+        <div class="chart" id="cFlows"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Por instrumento</h3><p class="hint">Total comprado (derecha) y vendido (izquierda) en el periodo</p></div></div>
+        <div class="chart" id="cInOut"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Detalle de un instrumento</h2>
+    <div class="card">
+      <div class="card-head">
+        <div><h3 id="detTitle">—</h3><p class="hint" id="detHint"></p></div>
+        <select id="detSel"></select>
+      </div>
+      <div class="detail-stats" id="detStats"></div>
+      <div class="chart tall" id="cDetail"></div>
+      <div class="tablewrap" style="margin-top:10px;max-height:320px"><table id="detMoves"></table></div>
+    </div>
+  </section>
+
+  <section id="infSection">
+    <h2>Inflación y valor del dinero</h2>
+    <p class="lede">Inflación real del INPC (INEGI) para el pasado y tu supuesto para el futuro. Responde cuánto valen hoy tus aportaciones, cuánto de tu ganancia es real y qué representa tu dinero en otras fechas.</p>
+    <div class="cfg" style="margin-bottom:10px">Inflación supuesta a futuro <input class="rate" type="number" step="0.1" min="0" id="infIn">% <span style="color:var(--muted)" id="inpcLast"></span></div>
+    <div class="kpis" id="infKpis"></div>
+    <div class="card">
+      <div class="card-head"><div><h3>Valor vs. aportado ajustado por inflación</h3><p class="hint" id="infHint"></p></div><div class="seg" id="infMode"><button data-value="nom">Nominal</button><button data-value="real">Pesos de hoy</button></div></div>
+      <div class="chart tall" id="cInf"></div>
+    </div>
+    <div class="grid3" id="tvBox" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:12px"></div>
+  </section>
+
+  <section id="retSection">
+    <h2>Proyección de retiro</h2>
+    <p class="lede">Con tu saldo y rendimiento reales, y tres formas de calcular el retiro mensual. Todo es editable y se guarda en este navegador.</p>
+    <div class="cfg" id="retCfg" style="margin-bottom:12px"></div>
+    <div class="kpis" id="retKpis"></div>
+    <div class="card">
+      <div class="card-head"><div><h3>Saldo por edad</h3><p class="hint">Acumulación hasta el retiro y luego retiros que crecen con la inflación</p></div></div>
+      <div class="chart tall" id="cRet"></div>
+      <p class="note" id="retNote"></p>
+    </div>
+  </section>
+
+  <section id="fireSection">
+    <h2>FIRE: independencia financiera</h2>
+    <p class="lede">Cuánto podrías retirar al mes de forma sostenible si empezaras hoy, y qué tan probable es que el dinero dure. Todo en <b>pesos de hoy</b>: rendimientos reales (descontando la inflación supuesta) y retiros que se ajustan por inflación.</p>
+    <div class="cfg" id="fireCfg" style="margin-bottom:12px"></div>
+    <div class="kpis" id="fireKpis"></div>
+    <div class="card">
+      <div class="card-head"><div><h3>Escenario: retirar desde hoy</h3><p class="hint" id="fireHint"></p></div></div>
+      <div class="lg" id="lgFire"></div>
+      <div class="chart" id="cFire" style="height:420px"></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card">
+        <div class="card-head"><div><h3>¿Qué tasa de retiro aguanta tu portafolio?</h3><p class="hint" id="swrHint"></p></div></div>
+        <div class="chart" id="cSwr"></div>
+      </div>
+      <div class="card" id="fireWhy"></div>
+    </div>
+  </section>
+
+  <section id="riskSection" data-default-collapsed>
+    <h2>Riesgo vs. rendimiento por perfil <span class="tag">avanzado</span></h2>
+    <p class="lede">Rendimiento puesto en perspectiva con su riesgo: volatilidad, peor caída, peor mes y Sharpe (rendimiento extra sobre la tasa libre de riesgo por cada unidad de volatilidad). El perfil sale de la columna “Riesgo” de la tabla de instrumentos.</p>
+    <div class="cfg" style="margin-bottom:10px">Tasa libre de riesgo (CETES) <input class="rate" type="number" step="0.05" min="0" id="rfIn">%</div>
+    <div class="tablewrap"><table id="riskTbl"></table></div>
+    <p class="note" id="riskNote"></p>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head"><div><h3>¿Qué hubiera pasado si…?</h3><p class="hint">Aplica los rendimientos históricos de cada perfil a una mezcla distinta, manteniéndola constante (rebalanceo mensual). No predice el futuro: muestra el intercambio entre rendimiento y riesgo que hubo.</p></div></div>
+      <div class="cfg" style="margin-bottom:6px">Mover <input type="range" id="simPct" min="0" max="50" step="1" style="width:160px"> <b id="simPctLbl" style="color:var(--ink);min-width:36px"></b> del portafolio de <select id="simFrom"></select> a <select id="simTo"></select></div>
+      <p class="note" id="simInfo" style="margin:0 0 10px"></p>
+      <div class="kpis" id="simKpis"></div>
+      <div class="chart tall" id="cSim"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head"><div><h3>¿De dónde sale la volatilidad?</h3><p class="hint">La de tu mezcla actual: la que usan el simulador y la sección FIRE</p></div></div>
+      <div class="kpis" id="volKpis"></div>
+      <div class="grid2">
+        <div>
+          <div class="tablewrap"><table id="volTbl"></table></div>
+          <div id="volWhy" style="font-size:13px;line-height:1.55;color:var(--ink2);margin-top:10px"></div>
+        </div>
+        <div><div class="chart" id="cVol"></div><p class="note" id="volNote"></p></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head"><div><h3>Frontera eficiente (Markowitz)</h3><p class="hint">Todas las mezclas posibles de tus perfiles, con sus rendimientos y correlaciones históricas</p></div></div>
+      <div class="kpis" id="effKpis"></div>
+      <div class="grid2">
+        <div><div class="chart tall" id="cFrontier"></div></div>
+        <div id="effWhy" style="font-size:13px;line-height:1.55;color:var(--ink2)"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Todos los instrumentos</h2>
+    <p class="lede">Clic en un encabezado para ordenar. Tipo, Clase, Región, Riesgo y Moneda son editables (se guardan en este navegador y los gráficos se recalculan); “Exportar clasificación” descarga el JSON para guardarlo en <code>private/instruments.json</code>. “Excluir” quita un instrumento de todos los cálculos.</p>
+    <div class="actions" style="margin-bottom:8px"><button id="aiToggle">Completar con IA</button><button id="exportCls">Exportar clasificación</button><button id="resetCls">Restablecer clasificación</button><span id="exclList" style="color:var(--ink2);font-size:13px"></span></div>
+    <div class="card" id="aiBox" hidden style="margin-bottom:12px">
+      <div class="card-head"><div><h3>Completar con IA</h3><p class="hint">Pide a cualquier IA (ChatGPT, Claude, Gemini…) el tipo, moneda, clase, región, riesgo y calendario de dividendos de tus instrumentos. El prompt sólo incluye tus tickers, no tus montos. Revisa la respuesta: la IA puede equivocarse.</p></div></div>
+      <div class="grid2">
+        <div><p class="note" style="margin:0 0 6px"><b>1.</b> Copia el prompt y pégalo en tu IA.</p>
+          <textarea id="aiPrompt" class="ai-area" rows="12" readonly></textarea>
+          <div class="actions" style="margin-top:6px"><button id="aiCopy">Copiar prompt</button></div></div>
+        <div><p class="note" style="margin:0 0 6px"><b>2.</b> Pega aquí la respuesta (el JSON, con o sin <code>```json</code>).</p>
+          <textarea id="aiReply" class="ai-area" rows="12" placeholder='{ "instruments": { "VOO": { "tipo": "ETF", ... } } }'></textarea>
+          <div class="actions" style="margin-top:6px"><button id="aiImport">Importar</button><button id="aiClear">Borrar calendario importado</button></div></div>
+      </div>
+      <ul class="warn-list" id="aiResult"></ul>
+      <p class="note">Se guarda en este navegador. Para guardarlo junto a tus datos: “Exportar clasificación” y copia el archivo a <code>private/instruments.json</code>, o guarda la respuesta en un archivo y corre <code>uv run gbm import-ai respuesta.json</code>. También puedes obtener el prompt con <code>uv run gbm prompt</code>.</p>
+    </div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+    <p class="note">Rendimiento mensual = generado ÷ (valor al inicio + ½ flujo neto del mes). Anualizado = (1 + acumulado)^(12 / meses) − 1. Volatilidad = desviación estándar mensual × √12. Eficiencia = % de las ganancias del periodo ÷ peso promedio en el portafolio (más de 1× = aportó más ganancia que su peso).</p>
+  </section>
+</div>
+<nav class="toc" id="toc" aria-label="Secciones"></nav>
+<button class="toc-btn" id="tocBtn" aria-expanded="false" aria-controls="tocMenu">☰ Secciones</button>
+<nav class="toc-menu" id="tocMenu" hidden aria-label="Secciones"></nav>
+<div id="toast"></div>
+
+<script>
+const DATA = __DATA__;
+</script>
+<script>
+"use strict";
+//__APP__
+</script>
+</body>
+</html>
