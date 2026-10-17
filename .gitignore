@@ -1,0 +1,21 @@
+# Datos personales: estados de cuenta, texto extraído (nombre, RFC, CLABE), datos parseados y clasificación.
+# Todo lo personal vive en private/ (usa subcarpetas de private/ con `gbm --data-dir`) y nunca se sube al repositorio.
+private/*
+!private/.gitkeep
+*.pdf
+.env
+.env.*
+# Credenciales de GBM (JWT): sólo en private/credentials.env, y bórralo al terminar
+credentials.env
+
+# Dashboard generado (incluye tus montos)
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+.DS_Store
