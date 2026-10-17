@@ -1,0 +1,37 @@
+{
+  "instruments": {
+    "VOO": {
+      "nombre": "Vanguard S&P 500",
+      "tipo": "ETF",
+      "moneda": "USD",
+      "clase": "Renta variable",
+      "region": "EE.UU.",
+      "riesgo": "Moderado",
+      "dividendos": {
+        "frecuencia": "trimestral",
+        "meses_pago": [3, 6, 9, 12],
+        "yield_anual_aprox": 0.013
+      },
+      "confianza": "alta"
+    },
+    "SHV": {
+      "nombre": "iShares Short Treasury Bond",
+      "tipo": "ETF",
+      "moneda": "USD",
+      "clase": "Renta fija",
+      "region": "EE.UU.",
+      "riesgo": "Conservador"
+    },
+    "FMTY": {
+      "nombre": "Fibra Mty",
+      "tipo": "FIBRA",
+      "moneda": "MXN",
+      "clase": "Bienes raíces",
+      "region": "México",
+      "riesgo": "Moderado"
+    }
+  },
+  "aliases": {
+    "OCLN": "QCLN"
+  }
+}
