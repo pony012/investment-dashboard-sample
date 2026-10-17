@@ -149,6 +149,7 @@ Las fechas y montos reales los anuncia cada emisora; la tabla trae un enlace par
 |---|---|---|---|
 | Índice base 100 | Encadena los rendimientos mensuales (TWR) del portafolio y de cada grupo | Periodo, "Agrupar por", dividendos sí/no | — |
 | Eficiencia | % de las ganancias del periodo ÷ peso promedio en el portafolio | Periodo | — |
+| Atípicos | Instrumento con menos de 6 meses en el periodo y anualizado mayor a ±50% (p. ej. una acción que se fusionó a los 2 meses). Se oculta del ranking, riesgo vs. rendimiento, mapa de calor e insights, pero sigue contando en los totales del portafolio | Casilla "Ocultar atípicos"; botón "Atípico" en la tabla para marcar o desmarcar cualquiera ("Excluir" lo quita de todo) | — |
 | Yield y yield de 12 meses | Distribuciones netas ÷ valor promedio invertido (anualizado) | Periodo | — |
 | ¿Quién paga y cada cuándo? | Frecuencia observada = meses distintos con pago en los últimos 12 meses (≥ 9 mensual, 3–5 trimestral, 2 semestral, 1 anual); si el instrumento lleva menos de 12 meses contigo, usa el calendario importado | — | Calendario de "Completar con IA" (opcional) |
 | Riesgo vs. rendimiento por perfil | Volatilidad = desviación estándar mensual × √12; peor caída; Sharpe = (rendimiento − tasa libre de riesgo) ÷ volatilidad. El perfil sale de la columna Riesgo | Tasa libre de riesgo (CETES), clasificación de riesgo | Riesgo de "Completar con IA" (opcional) |

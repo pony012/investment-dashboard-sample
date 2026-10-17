@@ -837,8 +837,8 @@ function renderTable() {
       return `<td class="l">${sw(colorFor(item.edit, it.cls[item.edit]))}<select data-key="${esc(it.tk)}" data-dim="${item.edit}">${vals.map(value => `<option${value === it.cls[item.edit] ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></td>`;
     }
     const value = item.get(it);
-    if (item.key === 'x') return it.isCash ? '<td></td>' : `<td class="l"><button class="chip" data-excl="${esc(it.tk)}" title="Quitar de todos los cálculos">✕ Excluir</button></td>`;
-    if (item.key === 'tk') return `<td class="l"><b style="font-weight:600">${esc(it.isCash ? 'Efectivo' : it.tk)}</b>${it.active ? '' : ' <span style="color:var(--muted)">(cerrado)</span>'}</td>`;
+    if (item.key === 'x') return it.isCash ? '<td></td>' : `<td class="l"><button class="chip${it.outlier ? ' out-on' : ''}" data-out="${esc(it.tk)}" title="${it.outlier ? `Atípico: ${esc(it.outlierWhy)}. Clic para dejar de tratarlo como atípico` : 'Ocultar de las vistas por instrumento (sigue en los totales)'}">${it.outlier ? '✓ Atípico' : 'Atípico'}</button> <button class="chip" data-excl="${esc(it.tk)}" title="Quitar de todos los cálculos">✕ Excluir</button></td>`;
+    if (item.key === 'tk') return `<td class="l"><b style="font-weight:600">${esc(it.isCash ? 'Efectivo' : it.tk)}</b>${it.active ? '' : ' <span style="color:var(--muted)">(cerrado)</span>'}${it.outlier ? ' <span class="tag">atípico</span>' : ''}</td>`;
     return `<td class="${item.left ? 'l' : ''}">${item.format ? (value == null ? '—' : item.format(value)) : esc(value)}</td>`;
   }).join('') + '</tr>').join('') + '</tbody>';
   document.getElementById('tbl').innerHTML = head + body;

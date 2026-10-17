@@ -49,7 +49,7 @@ function renderDataQuality() {
 }
 
 function renderInsights() {
-  const { V, rangeStart, rangeEnd, ranked, retIdx, groupBy, R } = model;
+  const { V, rangeStart, rangeEnd, ranked, shown, retIdx, groupBy, R } = model;
   const kp = model.kp, out = [];
   const startValue = rangeStart > 0 ? V[rangeStart - 1] : 0;
   if (kp.growth > 0) {
@@ -57,7 +57,7 @@ function renderInsights() {
       ? `Pasaste de <b>${moneyC(startValue)}</b> a <b>${moneyC(V[rangeEnd])}</b> (${(V[rangeEnd] / startValue).toFixed(1)}×). <b>${pct((kp.ahorro) / kp.growth, 0)}</b> vino de tu ahorro y <b>${pct(kp.rend / kp.growth, 0)}</b> de rendimientos.`
       : `Tu cuenta vale <b>${moneyC(V[rangeEnd])}</b>: aportaste <b>${moneyC(kp.ahorro)}</b> (contando lo que ya tenías en ${ymLabel(YM[0])}) y los rendimientos sumaron <b>${moneyC(kp.rend)}</b>.` });
   }
-  const rated = ranked.filter(it => it.st.ann != null && it.st.nm >= 12).sort((left, right) => right.st.ann - left.st.ann);
+  const rated = shown.filter(it => it.st.ann != null && it.st.nm >= 12).sort((left, right) => right.st.ann - left.st.ann);
   if (rated.length >= 3) {
     const top = rated.slice(0, 3).map(it => `<b>${esc(it.tk)}</b> (${pct(it.st.ann, 1, true)})`).join(', ');
     const bot = rated.slice(-2).reverse().map(it => `<b>${esc(it.tk)}</b> (${pct(it.st.ann, 1, true)})`).join(' y ');
@@ -73,7 +73,7 @@ function renderInsights() {
       const best = groups[0], worst = groups[groups.length - 1];
       out.push({ title: `Eficiencia por ${DIMS[state.dim].label.toLowerCase()}`, body: `<b>${esc(best.name)}</b> generó ${pct(best.gain / model.totalGain, 0)} de tus ganancias con ${pct(best.weight, 0)} de peso promedio (${best.eff.toFixed(1)}×). En cambio <b>${esc(worst.name)}</b> pesó ${pct(worst.weight, 0)} y aportó ${pct(worst.gain / model.totalGain, 0)} (${worst.eff.toFixed(1)}×).` });
     }
-    const topGain = [...ranked].sort((left, right) => right.st.gain - left.st.gain)[0];
+    const topGain = [...shown].sort((left, right) => right.st.gain - left.st.gain)[0];
     if (topGain && topGain.st.gain > 0) out.push({ title: 'Mayor generador en $', body: `<b>${esc(topGain.tk)}</b> (${esc(topGain.name)}) generó <b>${money(topGain.st.gain)}</b>, el ${pct(topGain.st.gainShare, 0)} de todas las ganancias del periodo.` });
   }
   const rs = retIdx.filter(monthIdx => R[monthIdx] != null).map(monthIdx => ({ monthIdx, ret: R[monthIdx] })).sort((left, right) => right.ret - left.ret);
@@ -348,11 +348,19 @@ function renderTreemap() {
 }
 
 /* ============================== Rendimiento por instrumento ============================== */
+function renderOutliers() {
+  const flagged = model.ranked.filter(it => it.outlier);
+  document.getElementById('hideOut').checked = !!state.hideOut;
+  document.getElementById('outList').innerHTML = flagged.length
+    ? (state.hideOut ? 'Ocultos: ' : 'Atípicos (visibles): ') + flagged.map(it => `<button class="chip" data-unout="${esc(it.tk)}" title="Dejar de tratarlo como atípico"><b style="color:var(--ink)">${esc(it.tk)}</b> (${esc(it.outlierWhy)}) ↺</button>`).join(' ')
+    : 'Ningún instrumento marcado como atípico.';
+}
+
 function renderRank() {
   const metric = state.rankMetric;
   setSeg('rankMetric', metric);
   const get = it => metric === 'ann' ? it.st.ann : metric === 'gain' ? it.st.gain : it.st.eff;
-  const rows = model.ranked.filter(it => get(it) != null && (metric !== 'eff' || it.st.wAvg > 0.002)).map(it => ({ it, value: get(it) })).sort((left, right) => right.value - left.value);
+  const rows = model.shown.filter(it => get(it) != null && (metric !== 'eff' || it.st.wAvg > 0.002)).map(it => ({ it, value: get(it) })).sort((left, right) => right.value - left.value);
   document.getElementById('rankHint').textContent = { ann: 'Rendimiento anualizado en el periodo', gain: 'Pesos generados en el periodo', eff: '% de las ganancias ÷ peso promedio. >1× = rindió más que su peso' }[metric];
   document.getElementById('retBasis').textContent = state.incDiv ? 'Incluye dividendos y distribuciones netas de ISR.' : 'Sólo plusvalías/minusvalías (sin dividendos).';
   const el = document.getElementById('cRank'); el.style.height = Math.max(300, rows.length * 22 + 40) + 'px';
@@ -374,7 +382,7 @@ function renderRank() {
 }
 
 function renderScatter() {
-  const pts = model.ranked.filter(it => it.st.vol != null && it.st.ann != null);
+  const pts = model.shown.filter(it => it.st.vol != null && it.st.ann != null);
   const tot = model.V[model.rangeEnd];
   const maxV = Math.max(...pts.map(it => Math.max(it.st.vEnd, it.st.wAvg * tot)), 1);
   const series = DIMS.riesgo.values.map(rv => ({
@@ -402,7 +410,7 @@ function renderHeat() {
   document.getElementById('heatHint').textContent = `Rendimiento de cada instrumento en cada ${({ m: 'mes', q: 'trimestre', y: 'año' })[gran]}` + (gran === 'm' ? '' : ' (meses encadenados; el último periodo puede estar incompleto)');
   rampLegend(document.getElementById('heatLegend'), heatMax, '');
   const qRet = (it, bk) => { let cum = 1, any = false; bk.idx.forEach(monthIdx => { const ret = monthReturn(model.rec[it.tk][monthIdx]); if (ret != null) { cum *= 1 + ret; any = true; } }); return any ? cum - 1 : null; };
-  const rows = model.ranked.filter(it => qs.some(bk => qRet(it, bk) != null))
+  const rows = model.shown.filter(it => qs.some(bk => qRet(it, bk) != null))
     .sort((left, right) => DIMS.tipo.values.indexOf(left.cls.tipo) - DIMS.tipo.values.indexOf(right.cls.tipo) || right.st.vEnd - left.st.vEnd);
   const el = document.getElementById('cHeat'); el.style.height = Math.max(260, rows.length * 22 + 50) + 'px';
   const chartInst = chart('cHeat'); chartInst.resize();

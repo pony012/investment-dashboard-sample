@@ -185,3 +185,4 @@ section { scroll-margin-top: 64px; }
 .freq.f-mensual { background: color-mix(in srgb, var(--s3) 22%, transparent); color: var(--ink); }
 .freq.f-trimestral { background: color-mix(in srgb, var(--s1) 22%, transparent); color: var(--ink); }
 .freq.f-semestral, .freq.f-anual, .freq.f-bimestral { background: color-mix(in srgb, var(--s4) 25%, transparent); color: var(--ink); }
+.chip.out-on { color: var(--ink); font-weight: 600; }

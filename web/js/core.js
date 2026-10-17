@@ -28,7 +28,7 @@ const state = {
   evoMode: 'valor', evoGran: 'm', compMode: 'pct', compBy: LS.get('compBy', 'grupo'), sb1: 'clase', sb2: 'tipo', sbPath: [], tmMetric: 'ann', rankMetric: 'ann',
   divGran: 'q', divMetric: 'yield', flowGran: 'q', flowBy: LS.get('flowBy', 'grupo'), heatGran: LS.get('heatGran', 'q'), calGran: LS.get('calGran', 'q'), detail: null, hideAmt: LS.get('hideAmt', false), theme: LS.get('theme', 'auto'),
   rf: LS.get('rf', 0.07), inf: LS.get('inf', 0.04), infMode: 'nom', sim: LS.get('sim', { from: 'Conservador', to: 'Moderado', pct: 10 }),
-  ret: LS.get('ret', {}), fire: LS.get('fire', {}), tv: LS.get('tv', {}), excl: LS.get('excl', []), sort: { col: 'valor', dir: -1 }, ovr: LS.get('cls', {}), divCal: LS.get('divcal', {}),
+  ret: LS.get('ret', {}), fire: LS.get('fire', {}), tv: LS.get('tv', {}), excl: LS.get('excl', []), sort: { col: 'valor', dir: -1 }, ovr: LS.get('cls', {}), divCal: LS.get('divcal', {}), hideOut: LS.get('hideOut', true), outOvr: LS.get('outOvr', {}),
 };
 let model = null;
 
@@ -58,6 +58,7 @@ function buckets(idxs, gran) {
 
 /* ============================== Modelo ============================== */
 const DIST_CATS = ['div', 'fibra', 'roc', 'frac'];
+const OUTLIER_MONTHS = 6, OUTLIER_ANN = 0.5;
 const CAT_INFO = { div: 'Dividendos (ETFs y acciones)', fibra: 'Resultado fiscal FIBRAs', roc: 'Reembolso de capital FIBRAs', frac: 'Pago de fracciones', isr: 'ISR retenido' };
 const distNetOf = flow => DIST_CATS.reduce((sum, cat) => sum + (flow[cat] || 0), 0) + (flow.isr || 0);
 
@@ -143,6 +144,16 @@ function buildModel() {
       active: vEnd !== 0 };
   });
   const ranked = insts.filter(it => !it.isCash);
+  // Atípicos: se ocultan de las vistas por instrumento (ranking, riesgo vs. rendimiento, mapa de calor, insights)
+  // pero siguen contando en los totales del portafolio. Automático: menos de OUTLIER_MONTHS meses con un anualizado
+  // extremo (el anualizado de pocos meses no significa nada); el usuario puede marcar o desmarcar cualquiera.
+  ranked.forEach(it => {
+    const auto = it.st.nm > 0 && it.st.nm < OUTLIER_MONTHS && it.st.ann != null && Math.abs(it.st.ann) > OUTLIER_ANN;
+    const manual = state.outOvr[it.tk];
+    it.outlier = manual != null ? manual : auto;
+    it.outlierWhy = manual === true ? 'marcado por ti' : manual === false ? null : auto ? `${it.st.nm} ${it.st.nm === 1 ? 'mes' : 'meses'} con ${pct(it.st.ann, 0, true)} anualizado` : null;
+  });
+  const shown = ranked.filter(it => !(state.hideOut && it.outlier));
   const totalGain = ranked.reduce((sum, it) => sum + it.st.gain, 0);
   insts.forEach(it => { it.st.gainShare = !it.isCash && totalGain ? it.st.gain / totalGain : null; it.st.eff = it.st.wAvg > 0.001 && it.st.gainShare != null ? it.st.gainShare / it.st.wAvg : null; });
 
@@ -160,7 +171,7 @@ function buildModel() {
     }).filter(group => group.members.length);
   };
 
-  return { n, tks, rec, V, F, G, R, valOf, rangeStart, rangeEnd, idx, retIdx, insts, ranked, totalGain, groupBy, gbm: buildDividends(idx, ex) };
+  return { n, tks, rec, V, F, G, R, valOf, rangeStart, rangeEnd, idx, retIdx, insts, ranked, shown, totalGain, groupBy, gbm: buildDividends(idx, ex) };
 }
 
 // Estadísticas de una serie de rendimientos mensuales en orden cronológico

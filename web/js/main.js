@@ -10,7 +10,7 @@ function renderAll() {
   document.getElementById('incDiv').checked = !!state.incDiv;
   setSeg('evoMode', state.evoMode);
   renderKPIs(); renderDataQuality(); renderInsights(); renderEvo(); renderGrowth(); renderYears(); renderComp(); renderSunburst(); renderTreemap();
-  renderRank(); renderScatter(); renderHeat(); renderRisk(); renderDividends(); renderFlows(); renderDetail(); renderInflation(); renderRetirement(); renderFire(); renderTable();
+  renderOutliers(); renderRank(); renderScatter(); renderHeat(); renderRisk(); renderDividends(); renderFlows(); renderDetail(); renderInflation(); renderRetirement(); renderFire(); renderTable();
 }
 function rerenderSafe() { try { renderAll(); } catch (err) { console.error(err); toast('Error: ' + err.message); } }
 
@@ -81,6 +81,8 @@ function bind() {
   document.getElementById('detSel').onchange = event => { state.detail = event.target.value; renderDetail(); };
   const setExcl = list => { state.excl = list; LS.set('excl', state.excl); if (state.detail && state.excl.includes(state.detail)) state.detail = null; rerenderSafe(); };
   document.getElementById('tbl').addEventListener('click', event => {
+    const ob = event.target.closest('[data-out]');
+    if (ob) { const it = model.ranked.find(inst => inst.tk === ob.dataset.out); state.outOvr = { ...state.outOvr, [it.tk]: !it.outlier }; LS.set('outOvr', state.outOvr); toast(`${it.tk}: ${it.outlier ? 'ya no es atípico' : 'marcado como atípico'}`); rerenderSafe(); return; }
     const xb = event.target.closest('[data-excl]'); if (xb) { setExcl([...state.excl, xb.dataset.excl]); toast(`${xb.dataset.excl} excluido de todos los cálculos`); return; }
     const th = event.target.closest('th'); if (!th || !th.dataset.col || th.dataset.col === 'x') return;
     const col = th.dataset.col; state.sort = { col, dir: state.sort.col === col ? -state.sort.dir : (COLS.find(item => item.key === col).left ? 1 : -1) }; renderTable();
@@ -94,6 +96,11 @@ function bind() {
   document.getElementById('exclList').addEventListener('click', event => {
     const button = event.target.closest('[data-incl]'); if (!button) return;
     setExcl(state.excl.filter(key => key !== button.dataset.incl)); toast(`${button.dataset.incl} incluido de nuevo`);
+  });
+  document.getElementById('hideOut').onchange = event => { state.hideOut = event.target.checked; LS.set('hideOut', state.hideOut); rerenderSafe(); };
+  document.getElementById('outList').addEventListener('click', event => {
+    const button = event.target.closest('[data-unout]'); if (!button) return;
+    state.outOvr = { ...state.outOvr, [button.dataset.unout]: false }; LS.set('outOvr', state.outOvr); toast(`${button.dataset.unout} ya no es atípico`); rerenderSafe();
   });
   document.getElementById('exportCls').onclick = exportClassification;
   document.getElementById('resetCls').onclick = () => { state.ovr = {}; LS.del('cls'); toast('Clasificación restablecida (la de private/instruments.json)'); rerenderSafe(); };
