@@ -356,6 +356,54 @@ function renderOutliers() {
     : 'Ningún instrumento marcado como atípico.';
 }
 
+/* Menú al hacer clic en un instrumento de las gráficas de rendimiento: ocultarlo como atípico (o mostrarlo) y ver detalle */
+const CLICK_HINT = () => `<div style="color:${TK.muted};margin-top:4px">Clic: ocultar o ver detalle</div>`;
+function closeInstMenu() { const menu = document.getElementById('instMenu'); if (menu) menu.hidden = true; }
+function openInstMenu(tk, clientX, clientY) {
+  const it = model.ranked.find(inst => inst.tk === tk); if (!it) return;
+  let menu = document.getElementById('instMenu');
+  if (!menu) { menu = document.createElement('div'); menu.id = 'instMenu'; menu.className = 'inst-menu'; document.body.appendChild(menu); }
+  const hidden = it.outlier && state.hideOut;
+  menu.innerHTML = `<div class="im-head"><b>${esc(it.tk)}</b> ${esc(it.name)}</div>` +
+    (it.outlier
+      ? `<button data-act="unout">↺ ${hidden ? 'Mostrar de nuevo' : 'Dejar de marcar como atípico'}</button>`
+      : `<button data-act="out">Ocultar de estas gráficas (atípico)</button>`) +
+    `<button data-act="detail">Ver detalle</button>` +
+    `<div class="im-note">Ocultar no lo quita de los totales del portafolio.</div>`;
+  menu.hidden = false;
+  const width = 250, height = menu.offsetHeight || 120;
+  menu.style.left = Math.max(8, Math.min(clientX + 8, window.innerWidth - width - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(clientY + 8, window.innerHeight - height - 8)) + 'px';
+  menu.onclick = event => {
+    const act = event.target.closest('button[data-act]'); if (!act) return;
+    closeInstMenu();
+    if (act.dataset.act === 'detail') {
+      state.detail = tk; renderDetail();
+      const sec = document.getElementById('detTitle').closest('section');
+      if (sec.classList.contains('collapsed')) setCollapsed(sec, false);
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const markOut = act.dataset.act === 'out';
+    state.outOvr = { ...state.outOvr, [tk]: markOut }; LS.set('outOvr', state.outOvr);
+    if (markOut && !state.hideOut) { state.hideOut = true; LS.set('hideOut', true); }
+    toast(markOut ? `${tk} oculto como atípico (sigue en los totales). Para mostrarlo: ↺ arriba del ranking` : `${tk} visible de nuevo`);
+    rerenderSafe();
+  };
+}
+// Conecta el clic en barras/puntos/celdas y en las etiquetas del eje con el menú del instrumento
+function bindInstClicks(chartInst, tkOf) {
+  chartInst.off('click');
+  chartInst.on('click', event => {
+    const tk = event.componentType === 'yAxis' ? event.value : tkOf(event);
+    const native = event.event && event.event.event;
+    if (tk && native) { native.stopPropagation(); openInstMenu(tk, native.clientX, native.clientY); }
+  });
+}
+document.addEventListener('click', event => { const menu = document.getElementById('instMenu'); if (menu && !menu.hidden && !menu.contains(event.target)) closeInstMenu(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeInstMenu(); });
+window.addEventListener('scroll', closeInstMenu, { passive: true });
+
 function renderRank() {
   const metric = state.rankMetric;
   setSeg('rankMetric', metric);
@@ -369,16 +417,17 @@ function renderRank() {
   const ref = metric === 'eff' ? 1 : 0;
   chartInst.setOption(base({
     grid: { left: 8, right: 56, top: 8, bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = rows[rows.length - 1 - param.dataIndex].it; return ttHead(`${it.tk} · ${it.name}`) + ttRow(null, 'Anualizado', pct(it.st.ann, 2, true)) + ttRow(null, 'Acumulado', pct(it.st.cum, 1, true)) + ttRow(null, 'Ganancia', money(it.st.gain)) + ttRow(null, 'Peso promedio', pct(it.st.wAvg, 1)) + ttRow(null, '% de las ganancias', pct(it.st.gainShare, 1)) + ttRow(null, 'Meses', it.st.nm); } }),
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = rows[rows.length - 1 - param.dataIndex].it; return ttHead(`${it.tk} · ${it.name}`) + ttRow(null, 'Anualizado', pct(it.st.ann, 2, true)) + ttRow(null, 'Acumulado', pct(it.st.cum, 1, true)) + ttRow(null, 'Ganancia', money(it.st.gain)) + ttRow(null, 'Peso promedio', pct(it.st.wAvg, 1)) + ttRow(null, '% de las ganancias', pct(it.st.gainShare, 1)) + ttRow(null, 'Meses', it.st.nm) + CLICK_HINT(); } }),
     xAxis: valAxis(metric === 'gain' ? moneyC : metric === 'eff' ? (value => value + '×') : (value => (value * 100).toFixed(0) + '%')),
-    yAxis: catAxis(rows.map(row => row.it.tk).reverse(), { axisLabel: { color: TK.ink2, fontSize: 11 } }),
+    yAxis: catAxis(rows.map(row => row.it.tk).reverse(), { triggerEvent: true, axisLabel: { color: TK.ink2, fontSize: 11 } }),
     series: [{
-      type: 'bar', barMaxWidth: 14,
+      type: 'bar', barMaxWidth: 14, cursor: 'pointer',
       data: rows.map(row => ({ value: row.value, itemStyle: { color: row.value >= ref ? TK.pos : TK.neg, opacity: row.it.st.nm < 12 ? 0.4 : 1, borderRadius: row.value >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] } })).reverse(),
       label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => fmt(param.value) },
       markLine: metric === 'eff' ? { symbol: 'none', silent: true, lineStyle: { color: TK.axis, type: 'solid' }, label: { show: false }, data: [{ xAxis: 1 }] } : undefined,
     }],
   }), true);
+  bindInstClicks(chartInst, event => event.componentType === 'series' ? rows[rows.length - 1 - event.dataIndex].it.tk : null);
 }
 
 function renderScatter() {
@@ -396,11 +445,12 @@ function renderScatter() {
   chart('cScatter').setOption(base({
     legend: legend(),
     grid: { left: 8, right: 24, top: document.getElementById('cScatter').clientWidth < 480 ? 58 : 36, bottom: 26, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = param.data.it; return ttHead(`${it.tk} · ${it.name}`) + ttRow(null, 'Anualizado', pct(it.st.ann, 2, true)) + ttRow(null, 'Volatilidad anual', pct(it.st.vol, 1)) + ttRow(null, 'Valor al cierre', money(it.st.vEnd)) + ttRow(null, 'Meses', it.st.nm); } }),
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = param.data.it; return ttHead(`${it.tk} · ${it.name}`) + ttRow(null, 'Anualizado', pct(it.st.ann, 2, true)) + ttRow(null, 'Volatilidad anual', pct(it.st.vol, 1)) + ttRow(null, 'Valor al cierre', money(it.st.vEnd)) + ttRow(null, 'Meses', it.st.nm) + CLICK_HINT(); } }),
     xAxis: valAxis(value => (value * 100).toFixed(0) + '%', { name: 'Volatilidad', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: TK.muted, fontSize: 11 } }),
     yAxis: valAxis(value => (value * 100).toFixed(0) + '%'),
     series,
   }), true);
+  bindInstClicks(charts.cScatter, event => event.componentType === 'series' && event.data && event.data.it ? event.data.it.tk : null);
 }
 
 function renderHeat() {
@@ -424,11 +474,12 @@ function renderHeat() {
     grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: true },
     tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = rows[param.value[1]], bk = qs[param.value[0]];
       const gen = bk.idx.reduce((sum, monthIdx) => sum + (model.rec[it.tk][monthIdx] ? model.rec[it.tk][monthIdx].gen : 0), 0);
-      return ttHead(`${it.tk} · ${bucketLabel(bk.key, gran)}`) + ttRow(null, 'Rendimiento', pct(param.value[2], 2, true)) + ttRow(null, 'Generado', money(gen)) + ttRow(null, 'Valor al cierre', money(model.valOf(it.tk, bk.idx[bk.idx.length - 1]))); } }),
+      return ttHead(`${it.tk} · ${bucketLabel(bk.key, gran)}`) + ttRow(null, 'Rendimiento', pct(param.value[2], 2, true)) + ttRow(null, 'Generado', money(gen)) + ttRow(null, 'Valor al cierre', money(model.valOf(it.tk, bk.idx[bk.idx.length - 1]))) + CLICK_HINT(); } }),
     xAxis: catAxis(qs.map(bk => bucketLabel(bk.key, gran)), { position: 'top', splitArea: { show: false } }),
-    yAxis: catAxis(rows.map(it => it.tk), { inverse: true, axisLabel: { color: TK.ink2, fontSize: 11 } }),
-    series: [{ type: 'heatmap', data, itemStyle: { borderColor: TK.surface, borderWidth: gran === 'm' ? 1 : 2, borderRadius: gran === 'm' ? 2 : 3 },
+    yAxis: catAxis(rows.map(it => it.tk), { inverse: true, triggerEvent: true, axisLabel: { color: TK.ink2, fontSize: 11 } }),
+    series: [{ type: 'heatmap', data, cursor: 'pointer', itemStyle: { borderColor: TK.surface, borderWidth: gran === 'm' ? 1 : 2, borderRadius: gran === 'm' ? 2 : 3 },
       label: { show: window.innerWidth > 900 && qs.length <= 26, fontSize: 9, formatter: param => (param.value[2] * 100).toFixed(1) },
       emphasis: { itemStyle: { borderColor: TK.ink, borderWidth: 1 } } }],
   }), true);
+  bindInstClicks(chartInst, event => event.componentType === 'series' ? rows[event.value[1]].tk : null);
 }

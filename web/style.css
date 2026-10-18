@@ -186,3 +186,10 @@ section { scroll-margin-top: 64px; }
 .freq.f-trimestral { background: color-mix(in srgb, var(--s1) 22%, transparent); color: var(--ink); }
 .freq.f-semestral, .freq.f-anual, .freq.f-bimestral { background: color-mix(in srgb, var(--s4) 25%, transparent); color: var(--ink); }
 .chip.out-on { color: var(--ink); font-weight: 600; }
+
+.inst-menu { position: fixed; z-index: 60; width: 250px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.2); padding: 6px; }
+.inst-menu .im-head { padding: 6px 8px 8px; font-size: 13px; color: var(--ink2); border-bottom: 1px solid var(--grid); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inst-menu .im-head b { color: var(--ink); }
+.inst-menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 8px; border-radius: 6px; }
+.inst-menu button:hover { background: var(--surface-2); }
+.inst-menu .im-note { font-size: 11.5px; color: var(--muted); padding: 4px 8px 2px; }
