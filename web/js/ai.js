@@ -32,13 +32,13 @@ function validateAiReply(reply) {
   const clean = {}, warnings = [];
   Object.entries(data).forEach(([rawTk, entry]) => {
     const tk = byUpper[String(rawTk).trim().toUpperCase()];
-    if (!tk) { warnings.push(`${rawTk}: no está en tu portafolio, se ignora`); return; }
+    if (!tk) { warnings.push(L(`${rawTk}: no está en tu portafolio, se ignora`, `${rawTk}: not in your portfolio, ignored`)); return; }
     if (!entry || typeof entry !== 'object') return;
     const out = {};
     if (typeof entry.nombre === 'string' && entry.nombre.trim()) out.nombre = entry.nombre.trim().slice(0, 80);
     Object.entries(allowed).forEach(([field, options]) => {
       if (options.includes(entry[field])) out[field] = entry[field];
-      else if (entry[field] != null) warnings.push(`${tk}: ${field} "${entry[field]}" no es una opción válida, se ignora`);
+      else if (entry[field] != null) warnings.push(L(`${tk}: ${field} "${entry[field]}" no es una opción válida, se ignora`, `${tk}: ${field} "${entry[field]}" is not a valid option, ignored`));
     });
     const div = entry.dividendos;
     if (div && typeof div === 'object') {
@@ -55,13 +55,13 @@ function validateAiReply(reply) {
     if (Object.keys(out).length) clean[tk] = out;
   });
   const missing = tickers.filter(tk => !clean[tk]);
-  if (missing.length) warnings.push('Sin respuesta para: ' + missing.join(', '));
+  if (missing.length) warnings.push(L('Sin respuesta para: ', 'No answer for: ') + missing.join(', '));
   return { clean, warnings };
 }
 
 function importAiReply(text) {
   let reply;
-  try { reply = extractJson(text); } catch (err) { return { error: 'La respuesta no es JSON válido: ' + err.message }; }
+  try { reply = extractJson(text); } catch (err) { return { error: L('La respuesta no es JSON válido: ', 'The answer is not valid JSON: ') + err.message }; }
   const { clean, warnings } = validateAiReply(reply);
   Object.entries(clean).forEach(([tk, entry]) => {
     const { dividendos, confianza, notas, ...cls } = entry;
@@ -79,15 +79,15 @@ function setupAiBox() {
   document.getElementById('aiCopy').onclick = async () => {
     const area = document.getElementById('aiPrompt');
     try { await navigator.clipboard.writeText(area.value); } catch (err) { area.select(); document.execCommand('copy'); }
-    toast('Prompt copiado: pégalo en tu IA');
+    toast(L('Prompt copiado: pégalo en tu IA', 'Prompt copied: paste it into your AI'));
   };
   document.getElementById('aiImport').onclick = () => {
     const result = importAiReply(document.getElementById('aiReply').value);
     const out = document.getElementById('aiResult');
     if (result.error) { out.innerHTML = `<li class="down">${esc(result.error)}</li>`; return; }
-    out.innerHTML = `<li><b>${result.count}</b> instrumento(s) actualizados en este navegador. Usa “Exportar clasificación” para guardarlos en <code>private/instruments.json</code>.</li>` + result.warnings.map(warning => `<li>${esc(warning)}</li>`).join('');
-    toast(`Clasificación de IA importada: ${result.count} instrumento(s)`);
+    out.innerHTML = L(`<li><b>${result.count}</b> instrumento(s) actualizados en este navegador. Usa “Exportar clasificación” para guardarlos en <code>private/instruments.json</code>.</li>`, `<li><b>${result.count}</b> instrument(s) updated in this browser. Use “Export classification” to save them in <code>private/instruments.json</code>.</li>`) + result.warnings.map(warning => `<li>${esc(warning)}</li>`).join('');
+    toast(L(`Clasificación de IA importada: ${result.count} instrumento(s)`, `AI classification imported: ${result.count} instrument(s)`));
     rerenderSafe();
   };
-  document.getElementById('aiClear').onclick = () => { state.divCal = {}; LS.del('divcal'); toast('Calendario de dividendos importado borrado'); rerenderSafe(); };
+  document.getElementById('aiClear').onclick = () => { state.divCal = {}; LS.del('divcal'); toast(L('Calendario de dividendos importado borrado', 'Imported dividend calendar deleted')); rerenderSafe(); };
 }

@@ -9,14 +9,14 @@ from pathlib import Path
 
 from . import known, paths
 
-JS_ORDER = ['core.js', 'helpers.js', 'sections1.js', 'sections2.js', 'ai.js', 'main.js']
+JS_ORDER = ['i18n.js', 'core.js', 'helpers.js', 'sections1.js', 'sections2.js', 'ai.js', 'main.js']
 
 
-def render_html(portfolio, classification, aliases=None, demo=False):
+def render_html(portfolio, classification, aliases=None, demo=False, lang=None):
     inpc = json.loads(paths.INPC.read_text())['values'] if paths.INPC.exists() else {}
     from .ai import FRECUENCIAS, build_prompt
     data = {'portfolio': portfolio, 'cls': classification, 'aliases': aliases or {}, 'inpc': inpc, 'demo': demo,
-            'aiPrompt': build_prompt(portfolio['instruments'], classification), 'frecuencias': FRECUENCIAS,
+            'aiPrompt': build_prompt(portfolio['instruments'], classification), 'frecuencias': FRECUENCIAS, 'lang': lang,
             'built': datetime.now().isoformat(timespec='seconds')}
     payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
     web = paths.TEMPLATE.parent
@@ -27,7 +27,7 @@ def render_html(portfolio, classification, aliases=None, demo=False):
                 .replace('__DATA__', payload))
 
 
-def build(demo=False, out=None):
+def build(demo=False, out=None, lang=None):
     if demo:
         from .demo import demo_portfolio
         portfolio = demo_portfolio()
@@ -44,7 +44,7 @@ def build(demo=False, out=None):
             classification[tk] = known.suggest(tk, portfolio['instruments'][tk])
         if missing:
             print(f'Sin clasificar (se usan sugerencias): {", ".join(missing)}. Corre `uv run gbm classify`.', file=sys.stderr)
-    html = render_html(portfolio, classification, aliases, demo)
+    html = render_html(portfolio, classification, aliases, demo, lang)
     target = paths.DIST / ('demo.html' if demo else 'index.html') if out is None else Path(out)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(html)

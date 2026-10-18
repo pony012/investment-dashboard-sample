@@ -100,6 +100,11 @@ private/
 dist/index.html            el dashboard, con tus montos
 ```
 
+**Idioma / Language**: el dashboard está en español e inglés. El botón ES/EN del encabezado lo cambia (se recuerda en
+el navegador); por defecto usa el idioma de tu navegador. También puedes fijarlo al generarlo con
+`uv run gbm build --lang en` o abrir `dist/index.html?lang=en`. Los nombres de tus instrumentos, las descripciones de
+los movimientos (tal como vienen de GBM) y los avisos del parser se muestran como están.
+
 El dashboard guarda en el navegador (localStorage) tus preferencias: periodo, tema, supuestos de retiro y FIRE y los
 cambios de clasificación que hagas en la tabla. "Exportar clasificación" descarga un `instruments.json` para
 reemplazar el de `private/`.

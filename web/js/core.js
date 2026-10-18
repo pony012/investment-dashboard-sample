@@ -8,11 +8,11 @@ const isNum = value => typeof value === 'number' && isFinite(value);
 
 /* ============================== Clasificación ============================== */
 const DIMS = {
-  tipo:   { label: 'Tipo', values: ['ETF', 'Acción individual', 'FIBRA', 'Fondo de inversión', 'Deuda / bonos', 'Efectivo y reporto', 'Otro'] },
-  clase:  { label: 'Clase de activo', values: ['Renta variable', 'Renta fija', 'Bienes raíces', 'Alternativos', 'Efectivo'] },
-  region: { label: 'Región', values: ['EE.UU.', 'México', 'Internacional desarrollado', 'Mercados emergentes', 'Global'] },
-  riesgo: { label: 'Riesgo', values: ['Conservador', 'Moderado', 'Agresivo'] },
-  moneda: { label: 'Moneda', values: ['MXN', 'USD'] },
+  tipo:   { label: L('Tipo', 'Type'), values: ['ETF', 'Acción individual', 'FIBRA', 'Fondo de inversión', 'Deuda / bonos', 'Efectivo y reporto', 'Otro'] },
+  clase:  { label: L('Clase de activo', 'Asset class'), values: ['Renta variable', 'Renta fija', 'Bienes raíces', 'Alternativos', 'Efectivo'] },
+  region: { label: L('Región', 'Region'), values: ['EE.UU.', 'México', 'Internacional desarrollado', 'Mercados emergentes', 'Global'] },
+  riesgo: { label: L('Riesgo', 'Risk'), values: ['Conservador', 'Moderado', 'Agresivo'] },
+  moneda: { label: L('Moneda', 'Currency'), values: ['MXN', 'USD'] },
 };
 const CASH_CLS = { nombre: 'Efectivo y reporto', tipo: 'Efectivo y reporto', clase: 'Efectivo', region: 'México', riesgo: 'Conservador', moneda: 'MXN' };
 
@@ -37,12 +37,12 @@ function clsOf(tk) {
   const base = DATA.cls[tk] || { nombre: tk, tipo: 'Otro', clase: 'Renta variable', region: 'México', riesgo: 'Moderado', moneda: 'MXN' };
   return { ...base, ...(state.ovr[tk] || {}) };
 }
-const nameOf = tk => tk === CASH ? CASH_CLS.nombre : tk === 'EFEC' ? 'ISR / cargos sin emisora' : tk;
+const nameOf = tk => tk === CASH ? valueLabel(CASH_CLS.nombre) : tk === 'EFEC' ? L('ISR / cargos sin emisora', 'ISR / charges with no issuer') : tk;
 
 /* ============================== Utilidades de periodos ============================== */
-const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MES = EN ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] : ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const ymLabel = ym => `${MES[+ym.slice(5) - 1]} ${ym.slice(2, 4)}`;
-const ymQuarter = ym => `${ym.slice(2, 4)}T${Math.ceil(+ym.slice(5) / 3)}`;
+const ymQuarter = ym => `${ym.slice(2, 4)}${L('T', 'Q')}${Math.ceil(+ym.slice(5) / 3)}`;
 const bucketOf = (ym, gran) => gran === 'm' ? ym : gran === 'q' ? ymQuarter(ym) : ym.slice(0, 4);
 const bucketLabel = (key, gran) => gran === 'm' ? ymLabel(key) : key;
 const ymDiff = (fromYm, toYm) => (+toYm.slice(0, 4) - +fromYm.slice(0, 4)) * 12 + (+toYm.slice(5) - +fromYm.slice(5));
@@ -59,7 +59,7 @@ function buckets(idxs, gran) {
 /* ============================== Modelo ============================== */
 const DIST_CATS = ['div', 'fibra', 'roc', 'frac'];
 const OUTLIER_MONTHS = 6, OUTLIER_ANN = 0.5;
-const CAT_INFO = { div: 'Dividendos (ETFs y acciones)', fibra: 'Resultado fiscal FIBRAs', roc: 'Reembolso de capital FIBRAs', frac: 'Pago de fracciones', isr: 'ISR retenido' };
+const CAT_INFO = { div: L('Dividendos (ETFs y acciones)', 'Dividends (ETFs and stocks)'), fibra: L('Resultado fiscal FIBRAs', 'FIBRA taxable result'), roc: L('Reembolso de capital FIBRAs', 'FIBRA return of capital'), frac: L('Pago de fracciones', 'Fractional payments'), isr: L('ISR retenido', 'ISR withheld') };
 const distNetOf = flow => DIST_CATS.reduce((sum, cat) => sum + (flow[cat] || 0), 0) + (flow.isr || 0);
 
 // Capital promedio del mes (Modified Dietz con flujos a mitad de mes). En el mes de apertura se asume que
@@ -137,7 +137,7 @@ function buildModel() {
       if (!best || ret > best.ret) best = { ret, monthIdx }; if (!worst || ret < worst.ret) worst = { ret, monthIdx };
     });
     const vEnd = valOf(tk, rangeEnd);
-    return { key: tk, tk, cls, name: cls.nombre || tk, serie: info.serie || '', section: info.section || 'efectivo', first: info.first, last: info.last, isCash: tk === CASH,
+    return { key: tk, tk, cls, name: tk === CASH ? valueLabel(CASH_CLS.nombre) : (cls.nombre || tk), serie: info.serie || '', section: info.section || 'efectivo', first: info.first, last: info.last, isCash: tk === CASH,
       st: { cum: nm ? cum - 1 : null, ann: nm ? annualize(cum - 1, nm) : null, nm, gain, buys, sells, net: buys - sells, dist, lastR, best, worst,
         vol: rs.length >= 3 ? std(rs.map(item => item.ret)) * Math.sqrt(12) : null, wAvg: retIdx.length ? wsum / retIdx.length : 0, vEnd,
         wEnd: V[rangeEnd] > 0 ? vEnd / V[rangeEnd] : 0, tit: tk === CASH ? null : (MONTHS[rangeEnd].hold[tk] || [0])[0], rs, risk: seriesStats(rs.map(item => item.ret)) },
@@ -151,7 +151,7 @@ function buildModel() {
     const auto = it.st.nm > 0 && it.st.nm < OUTLIER_MONTHS && it.st.ann != null && Math.abs(it.st.ann) > OUTLIER_ANN;
     const manual = state.outOvr[it.tk];
     it.outlier = manual != null ? manual : auto;
-    it.outlierWhy = manual === true ? 'marcado por ti' : manual === false ? null : auto ? `${it.st.nm} ${it.st.nm === 1 ? 'mes' : 'meses'} con ${pct(it.st.ann, 0, true)} anualizado` : null;
+    it.outlierWhy = manual === true ? L('marcado por ti', 'marked by you') : manual === false ? null : auto ? L(`${it.st.nm} ${it.st.nm === 1 ? 'mes' : 'meses'} con ${pct(it.st.ann, 0, true)} anualizado`, `${it.st.nm} ${it.st.nm === 1 ? 'month' : 'months'} at ${pct(it.st.ann, 0, true)} annualized`) : null;
   });
   const shown = ranked.filter(it => !(state.hideOut && it.outlier));
   const totalGain = ranked.reduce((sum, it) => sum + it.st.gain, 0);
@@ -167,7 +167,7 @@ function buildModel() {
       const ret = YM.map((ym, monthIdx) => { if (!monthIdx) return null; let gen = 0, den = 0;
         members.forEach(it => { if (it.isCash) return; const entry = rec[it.tk][monthIdx]; const capital = dietzDen(entry); if (capital > 0) { gen += entry.gen; den += capital; } });
         return den > 0 ? gen / den : null; });
-      return { name: dimValue, members, value, flow, ret };
+      return { key: dimValue, name: valueLabel(dimValue), members, value, flow, ret };
     }).filter(group => group.members.length);
   };
 

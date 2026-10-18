@@ -30,6 +30,7 @@ def main():
     bd = sub.add_parser('build', help='genera dist/index.html')
     bd.add_argument('--demo', action='store_true', help='usa datos sintéticos (no necesita estados de cuenta)')
     bd.add_argument('--out', help='ruta de salida (default dist/index.html, o dist/demo.html con --demo)')
+    bd.add_argument('--lang', choices=['es', 'en'], help='idioma por defecto del dashboard (si no, el del navegador; el botón ES/EN lo cambia)')
 
     al = sub.add_parser('all', help='extract + parse + classify (sólo los nuevos) + build')
     al.add_argument('--yes', action='store_true', help='aceptar las sugerencias de clasificación sin preguntar')
@@ -59,7 +60,7 @@ def main():
         import_reply(args.file)
     elif args.cmd == 'build':
         from .build import build
-        build(demo=args.demo, out=args.out)
+        build(demo=args.demo, out=args.out, lang=args.lang)
     elif args.cmd == 'all':
         from .extract import extract_all
         from .parse import parse_all
