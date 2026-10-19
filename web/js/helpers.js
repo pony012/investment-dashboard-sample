@@ -51,7 +51,8 @@ function readTokens() {
   };
 }
 function colorFor(dim, value) {
-  const slot = DIMS[dim].values.indexOf(value);
+  let slot = DIMS[dim].values.indexOf(value);
+  if (slot < 0) slot = DIMS[dim].values.findIndex(raw => valueLabel(raw) === value);   // nombre ya traducido
   return slot >= 0 && slot < 8 ? TK.series[slot] : TK.other;
 }
 function hex2rgb(hex) { hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(char => char + char).join(''); return [0, 2, 4].map(offset => parseInt(hex.slice(offset, offset + 2), 16)); }

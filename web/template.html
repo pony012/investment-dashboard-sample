@@ -35,6 +35,7 @@
     </div>
     <label>Agrupar por <select id="dim"></select></label>
     <label><input type="checkbox" id="incDiv"> Incluir dividendos en los rendimientos</label>
+    <div class="seg lang-seg" id="langSeg" title="Idioma / Language"><button data-value="es">ES</button><button data-value="en">EN</button></div>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -117,6 +118,9 @@
   <section>
     <h2>Rendimiento por instrumento</h2>
     <p class="lede"><b id="retBasis" style="font-weight:600"></b> Rendimiento ponderado por tiempo (Modified Dietz por mes, encadenado). El efectivo y el reporto no entran en el ranking. Los instrumentos con menos de 12 meses aparecen atenuados: su anualizado es poco confiable.</p>
+    <div class="cfg" style="margin-bottom:10px"><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="hideOut" style="width:auto"> Ocultar atípicos</label>
+      <span id="outList" style="color:var(--ink2)"></span></div>
+    <p class="note" style="margin:-4px 0 10px">Atípico = menos de 6 meses en tu portafolio con un anualizado mayor a ±50% (o marcado por ti en “Todos los instrumentos”). Haz clic en un instrumento de cualquiera de estas gráficas para ocultarlo o ver su detalle; los ocultos aparecen arriba con ↺ para mostrarlos de nuevo. Se oculta del ranking, riesgo vs. rendimiento, mapa de calor e insights, pero <b>sigue contando</b> en el valor y el rendimiento del portafolio. Para quitar un instrumento de todos los cálculos usa “Excluir”.</p>
     <div class="grid2">
       <div class="card">
         <div class="card-head">
@@ -310,7 +314,7 @@
 
   <section>
     <h2>Todos los instrumentos</h2>
-    <p class="lede">Clic en un encabezado para ordenar. Tipo, Clase, Región, Riesgo y Moneda son editables (se guardan en este navegador y los gráficos se recalculan); “Exportar clasificación” descarga el JSON para guardarlo en <code>private/instruments.json</code>. “Excluir” quita un instrumento de todos los cálculos.</p>
+    <p class="lede">Clic en un encabezado para ordenar. Tipo, Clase, Región, Riesgo y Moneda son editables (se guardan en este navegador y los gráficos se recalculan); “Exportar clasificación” descarga el JSON para guardarlo en <code>private/instruments.json</code>. “Atípico” lo oculta sólo de las vistas por instrumento (ranking, riesgo vs. rendimiento, mapa de calor); “Excluir” lo quita de todos los cálculos.</p>
     <div class="actions" style="margin-bottom:8px"><button id="aiToggle">Completar con IA</button><button id="exportCls">Exportar clasificación</button><button id="resetCls">Restablecer clasificación</button><span id="exclList" style="color:var(--ink2);font-size:13px"></span></div>
     <div class="card" id="aiBox" hidden style="margin-bottom:12px">
       <div class="card-head"><div><h3>Completar con IA</h3><p class="hint">Pide a cualquier IA (ChatGPT, Claude, Gemini…) el tipo, moneda, clase, región, riesgo y calendario de dividendos de tus instrumentos. El prompt sólo incluye tus tickers, no tus montos. Revisa la respuesta: la IA puede equivocarse.</p></div></div>

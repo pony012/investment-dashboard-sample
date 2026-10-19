@@ -6,13 +6,13 @@ function renderAll() {
   model = buildModel();
   model.alt = { MD: state.incDiv ? model : withIncDiv(true), MP: state.incDiv ? withIncDiv(false) : model };
   const ocr = MONTHS.filter(month => month.mode === 'ocr').length;
-  document.getElementById('subtitle').textContent = `${MONTHS.length} estados de cuenta · ${ymLabel(YM[0])} a ${ymLabel(YM[YM.length - 1])}` + (ocr ? ` · ${ocr} leídos con OCR` : '') + (DATA.built ? ` · generado ${DATA.built.slice(0, 10)}` : '');
+  document.getElementById('subtitle').textContent = L(`${MONTHS.length} estados de cuenta · ${ymLabel(YM[0])} a ${ymLabel(YM[YM.length - 1])}`, `${MONTHS.length} account statements · ${ymLabel(YM[0])} to ${ymLabel(YM[YM.length - 1])}`) + (ocr ? L(` · ${ocr} leídos con OCR`, ` · ${ocr} read with OCR`) : '') + (DATA.built ? L(` · generado ${DATA.built.slice(0, 10)}`, ` · generated ${DATA.built.slice(0, 10)}`) : '');
   document.getElementById('incDiv').checked = !!state.incDiv;
   setSeg('evoMode', state.evoMode);
   renderKPIs(); renderDataQuality(); renderInsights(); renderEvo(); renderGrowth(); renderYears(); renderComp(); renderSunburst(); renderTreemap();
-  renderRank(); renderScatter(); renderHeat(); renderRisk(); renderDividends(); renderFlows(); renderDetail(); renderInflation(); renderRetirement(); renderFire(); renderTable();
+  renderOutliers(); renderRank(); renderScatter(); renderHeat(); renderRisk(); renderDividends(); renderFlows(); renderDetail(); renderInflation(); renderRetirement(); renderFire(); renderTable();
 }
-function rerenderSafe() { try { renderAll(); } catch (err) { console.error(err); toast('Error: ' + err.message); } }
+function rerenderSafe() { try { renderAll(); } catch (err) { console.error(err); toast(L('Error: ', 'Error: ') + err.message); } }
 
 function fillSelects() {
   const opts = YM.map((ym, index) => `<option value="${index}">${ymLabel(ym)}</option>`).join('');
@@ -36,7 +36,7 @@ function applyPreset(preset) {
 function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2600); }
 function applyTheme() {
   if (state.theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = state.theme;
-  document.getElementById('theme').textContent = 'Tema: ' + ({ auto: 'auto', light: 'claro', dark: 'oscuro' })[state.theme];
+  document.getElementById('theme').textContent = L('Tema: ', 'Theme: ') + ({ auto: 'auto', light: L('claro', 'light'), dark: L('oscuro', 'dark') })[state.theme];
 }
 function rebuildCharts() { Object.values(charts).forEach(chartInst => chartInst.dispose()); for (const id in charts) delete charts[id]; rerenderSafe(); }
 
@@ -46,7 +46,7 @@ function exportClassification() {
   const blob = new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' });
   const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'instruments.json'; link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  toast('Descargado instruments.json: cópialo a private/instruments.json y corre `uv run gbm build`');
+  toast(L('Descargado instruments.json: cópialo a private/instruments.json y corre `uv run gbm build`', 'Downloaded instruments.json: copy it to private/instruments.json and run `uv run gbm build`'));
 }
 
 function bind() {
@@ -61,7 +61,7 @@ function bind() {
   document.getElementById('to').onchange = onRange;
   document.querySelectorAll('#presets button').forEach(element => element.onclick = () => applyPreset(element.dataset.period));
   document.getElementById('dim').onchange = event => { state.dim = event.target.value; LS.set('dim', state.dim); rerenderSafe(); };
-  document.getElementById('incDiv').onchange = event => { state.incDiv = event.target.checked; LS.set('incDiv', state.incDiv); toast(state.incDiv ? 'Rendimientos = plusvalías + dividendos netos' : 'Rendimientos = sólo plusvalías'); rerenderSafe(); };
+  document.getElementById('incDiv').onchange = event => { state.incDiv = event.target.checked; LS.set('incDiv', state.incDiv); toast(state.incDiv ? L('Rendimientos = plusvalías + dividendos netos', 'Returns = capital gains + net dividends') : L('Rendimientos = sólo plusvalías', 'Returns = capital gains only')); rerenderSafe(); };
   const seg = (id, key, render, persist) => document.querySelectorAll(`#${id} button`).forEach(element => element.onclick = () => { state[key] = element.dataset.value; if (persist) LS.set(key, state[key]); render(); });
   seg('evoMode', 'evoMode', () => { setSeg('evoMode', state.evoMode); renderEvo(); });
   seg('evoGran', 'evoGran', renderEvo);
@@ -81,7 +81,9 @@ function bind() {
   document.getElementById('detSel').onchange = event => { state.detail = event.target.value; renderDetail(); };
   const setExcl = list => { state.excl = list; LS.set('excl', state.excl); if (state.detail && state.excl.includes(state.detail)) state.detail = null; rerenderSafe(); };
   document.getElementById('tbl').addEventListener('click', event => {
-    const xb = event.target.closest('[data-excl]'); if (xb) { setExcl([...state.excl, xb.dataset.excl]); toast(`${xb.dataset.excl} excluido de todos los cálculos`); return; }
+    const ob = event.target.closest('[data-out]');
+    if (ob) { const it = model.ranked.find(inst => inst.tk === ob.dataset.out); state.outOvr = { ...state.outOvr, [it.tk]: !it.outlier }; LS.set('outOvr', state.outOvr); toast(`${it.tk}: ${it.outlier ? L('ya no es atípico', 'no longer an outlier') : L('marcado como atípico', 'marked as an outlier')}`); rerenderSafe(); return; }
+    const xb = event.target.closest('[data-excl]'); if (xb) { setExcl([...state.excl, xb.dataset.excl]); toast(L(`${xb.dataset.excl} excluido de todos los cálculos`, `${xb.dataset.excl} excluded from every calculation`)); return; }
     const th = event.target.closest('th'); if (!th || !th.dataset.col || th.dataset.col === 'x') return;
     const col = th.dataset.col; state.sort = { col, dir: state.sort.col === col ? -state.sort.dir : (COLS.find(item => item.key === col).left ? 1 : -1) }; renderTable();
   });
@@ -89,14 +91,19 @@ function bind() {
     const select = event.target; if (select.tagName !== 'SELECT') return;
     const key = select.dataset.key, dim = select.dataset.dim;
     state.ovr[key] = Object.assign({}, state.ovr[key], { [dim]: select.value }); LS.set('cls', state.ovr);
-    toast(`${key}: ${DIMS[dim].label} → ${select.value}`); rerenderSafe();
+    toast(L(`${key}: ${DIMS[dim].label} → ${select.value}`, `${key}: ${DIMS[dim].label} → ${valueLabel(select.value)}`)); rerenderSafe();
   });
   document.getElementById('exclList').addEventListener('click', event => {
     const button = event.target.closest('[data-incl]'); if (!button) return;
-    setExcl(state.excl.filter(key => key !== button.dataset.incl)); toast(`${button.dataset.incl} incluido de nuevo`);
+    setExcl(state.excl.filter(key => key !== button.dataset.incl)); toast(L(`${button.dataset.incl} incluido de nuevo`, `${button.dataset.incl} included again`));
+  });
+  document.getElementById('hideOut').onchange = event => { state.hideOut = event.target.checked; LS.set('hideOut', state.hideOut); rerenderSafe(); };
+  document.getElementById('outList').addEventListener('click', event => {
+    const button = event.target.closest('[data-unout]'); if (!button) return;
+    state.outOvr = { ...state.outOvr, [button.dataset.unout]: false }; LS.set('outOvr', state.outOvr); toast(`${button.dataset.unout} ya no es atípico`); rerenderSafe();
   });
   document.getElementById('exportCls').onclick = exportClassification;
-  document.getElementById('resetCls').onclick = () => { state.ovr = {}; LS.del('cls'); toast('Clasificación restablecida (la de private/instruments.json)'); rerenderSafe(); };
+  document.getElementById('resetCls').onclick = () => { state.ovr = {}; LS.del('cls'); toast(L('Clasificación restablecida (la de private/instruments.json)', 'Classification reset (the one in private/instruments.json)')); rerenderSafe(); };
   document.getElementById('inpcLast').textContent = INPC_LAST ? `· INPC real hasta ${ymLabel(INPC_LAST)}` : '';
   document.getElementById('rfIn').onchange = event => { const value = parseFloat(event.target.value); if (!isFinite(value)) return; state.rf = value / 100; LS.set('rf', state.rf); rerenderSafe(); };
   const simSave = () => { LS.set('sim', state.sim); renderSim(profileSeries(model)); };
@@ -130,6 +137,13 @@ function bind() {
     LS.set('fire', state.fire); renderFire();
   });
   fireBox.addEventListener('click', event => { if (event.target.closest('button[data-preset="reset"]')) { state.fire = {}; LS.del('fire'); renderFire(); } });
+  setSeg('langSeg', LANG);
+  document.querySelectorAll('#langSeg button').forEach(element => element.onclick = () => {
+    if (element.dataset.value === LANG) return;
+    LS.set('lang', element.dataset.value);
+    location.hash = 'lang=' + element.dataset.value;   // también en el hash: sobrevive al reload aunque no haya localStorage
+    location.reload();
+  });
   document.getElementById('eye').onclick = () => { state.hideAmt = !state.hideAmt; LS.set('hideAmt', state.hideAmt); applyEye(); rerenderSafe(); };
   document.getElementById('theme').onclick = () => { state.theme = { auto: 'light', light: 'dark', dark: 'auto' }[state.theme]; LS.set('theme', state.theme); applyTheme(); rebuildCharts(); };
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (state.theme === 'auto') rebuildCharts(); });
@@ -140,8 +154,8 @@ const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2M6.6 6.6A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M2 2l20 20"/></svg>';
 function applyEye() {
   const el = document.getElementById('eye');
-  el.innerHTML = (state.hideAmt ? EYE_OFF : EYE) + `<span>${state.hideAmt ? 'Mostrar montos' : 'Ocultar montos'}</span>`;
-  el.setAttribute('aria-pressed', state.hideAmt); el.title = state.hideAmt ? 'Mostrar montos' : 'Ocultar montos (los % siguen visibles)';
+  el.innerHTML = (state.hideAmt ? EYE_OFF : EYE) + `<span>${state.hideAmt ? L('Mostrar montos', 'Show amounts') : L('Ocultar montos', 'Hide amounts')}</span>`;
+  el.setAttribute('aria-pressed', state.hideAmt); el.title = state.hideAmt ? L('Mostrar montos', 'Show amounts') : L('Ocultar montos (los % siguen visibles)', 'Hide amounts (percentages stay visible)');
 }
 const CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 function sectionsState() { return [...document.querySelectorAll('.wrap > section')].filter(element => !element.hidden); }
@@ -151,7 +165,7 @@ function setCollapsed(sec, on, save = true) {
   if (!on) requestAnimationFrame(() => { Object.values(charts).forEach(chartInst => { if (sec.contains(chartInst.getDom())) chartInst.resize(); }); if (model && sec.contains(document.getElementById('cSun'))) renderSunburst(); });
   if (save) LS.set('collapsed', [...document.querySelectorAll('.wrap > section.collapsed')].map(element => element.dataset.key));
   const anyOpen = sectionsState().some(section => !section.classList.contains('collapsed'));
-  document.getElementById('collapseAll').textContent = anyOpen ? 'Colapsar todo' : 'Expandir todo';
+  document.getElementById('collapseAll').textContent = anyOpen ? L('Colapsar todo', 'Collapse all') : L('Expandir todo', 'Expand all');
 }
 function setupSections() {
   // Secciones marcadas con data-default-collapsed empiezan colapsadas hasta que el usuario elija otra cosa
@@ -182,7 +196,7 @@ function setupSections() {
 function setupToc() {
   const secs = [...document.querySelectorAll('.wrap > section')];
   const label = sec => { const h2 = sec.querySelector(':scope > h2'); const text = [...h2.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join('').trim(); return text.split(':')[0].trim(); };
-  const items = [{ id: 'top', text: 'Resumen' }, ...secs.map(sec => { if (!sec.id) sec.id = 'sec-' + sec.dataset.key; return { id: sec.id, text: label(sec) }; })];
+  const items = [{ id: 'top', text: L('Resumen', 'Summary') }, ...secs.map(sec => { if (!sec.id) sec.id = 'sec-' + sec.dataset.key; return { id: sec.id, text: label(sec) }; })];
   const html = items.map(item => `<a href="#${item.id}" data-target="${item.id}"><span class="lbl">${esc(item.text)}</span><span class="bar"></span></a>`).join('');
   const toc = document.getElementById('toc'), menu = document.getElementById('tocMenu'), btn = document.getElementById('tocBtn');
   toc.innerHTML = html;
@@ -212,6 +226,7 @@ function setupToc() {
 
 document.getElementById('demoBanner').hidden = !DATA.demo;
 setupSections();
+translateStatic();
 setupToc();
 setupAiBox();
 applyTheme();
@@ -219,5 +234,5 @@ applyEye();
 bind();
 fillSelects();
 setSeg('presets', 'all');
-if (MONTHS.length < 3) document.querySelector('.wrap').insertAdjacentHTML('afterbegin', '<div class="demo-banner">Se necesitan al menos 3 estados de cuenta para el análisis.</div>');
+if (MONTHS.length < 3) document.querySelector('.wrap').insertAdjacentHTML('afterbegin', L('<div class="demo-banner">Se necesitan al menos 3 estados de cuenta para el análisis.</div>', '<div class="demo-banner">At least 3 account statements are needed for the analysis.</div>'));
 else rerenderSafe();
