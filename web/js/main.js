@@ -141,6 +141,7 @@ function bind() {
   document.querySelectorAll('#langSeg button').forEach(element => element.onclick = () => {
     if (element.dataset.value === LANG) return;
     LS.set('lang', element.dataset.value);
+    location.hash = 'lang=' + element.dataset.value;   // también en el hash: sobrevive al reload aunque no haya localStorage
     location.reload();
   });
   document.getElementById('eye').onclick = () => { state.hideAmt = !state.hideAmt; LS.set('hideAmt', state.hideAmt); applyEye(); rerenderSafe(); };
