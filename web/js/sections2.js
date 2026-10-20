@@ -344,15 +344,21 @@ function renderDivTk() {
   document.getElementById('divTkHint').textContent = metric === 'net' ? L('Pesos netos de ISR recibidos en el periodo', 'Pesos received net of ISR in the period') : L('Distribuciones netas ÷ valor promedio mientras lo tuviste, anualizado. Atenuados: menos de 6 meses.', 'Net distributions ÷ average value while you held it, annualized. Faded: less than 6 months.');
   const divEl = document.getElementById('cDivTk'), needH = Math.max(260, rows.length * 26 + 30); divEl.style.height = (FRAME == null ? needH : Math.max(needH, divEl.clientHeight)) + 'px';   // al animar sólo crece
   chart('cDivTk').resize();
+  const tip = stat => ttHead(`${stat.tk} · ${clsOf(stat.tk).nombre}`) + DIST_CATS.filter(cat => stat.cats[cat]).map(cat => ttRow(null, CAT_INFO[cat], money(stat.cats[cat]))).join('') + ttRow(null, L('ISR retenido', 'ISR withheld'), money(stat.isr)) + ttRow(null, L('Neto', 'Net'), money(stat.net)) +
+    ttRow(null, L('Valor promedio', 'Average value'), money(stat.avg)) + ttRow(null, L('Meses invertido', 'Months invested'), stat.months) + ttRow(null, L('Pagos al año', 'Payments per year'), stat.perYear.toFixed(1)) + ttRow(null, L('Yield bruto / neto', 'Gross / net yield'), `${pct(stat.yieldGross, 2)} / ${pct(stat.yield, 2)}`) + (stat.esp ? ttRow(null, L('En especie (ya en el valor)', 'In kind (already in the value)'), money(stat.esp)) : '');
+  const valueOf = stat => metric === 'net' ? stat.net : stat.yield, fmt = value => metric === 'net' ? moneyC(value) : pct(value, 1);
+  if (FRAME != null) {   // animación en el tiempo: carrera de barras
+    raceBars(charts.cDivTk, { rows: [...rows].reverse().map(stat => ({ key: stat.tk, label: stat.tk, value: valueOf(stat), stat, color: TK.series[0], opacity: stat.months < 6 ? 0.4 : 1 })), fmt,
+      axisFmt: metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%', tooltip: row => tip(row.stat), rowPx: 26 });
+    return;
+  }
   charts.cDivTk.setOption(base({
     grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const stat = rows[param.dataIndex];
-      return ttHead(`${stat.tk} · ${clsOf(stat.tk).nombre}`) + DIST_CATS.filter(cat => stat.cats[cat]).map(cat => ttRow(null, CAT_INFO[cat], money(stat.cats[cat]))).join('') + ttRow(null, L('ISR retenido', 'ISR withheld'), money(stat.isr)) + ttRow(null, L('Neto', 'Net'), money(stat.net)) +
-        ttRow(null, L('Valor promedio', 'Average value'), money(stat.avg)) + ttRow(null, L('Meses invertido', 'Months invested'), stat.months) + ttRow(null, L('Pagos al año', 'Payments per year'), stat.perYear.toFixed(1)) + ttRow(null, L('Yield bruto / neto', 'Gross / net yield'), `${pct(stat.yieldGross, 2)} / ${pct(stat.yield, 2)}`) + (stat.esp ? ttRow(null, L('En especie (ya en el valor)', 'In kind (already in the value)'), money(stat.esp)) : ''); } }),
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => tip(rows[param.dataIndex]) }),
     xAxis: valAxis(metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%'),
     yAxis: catAxis(rows.map(row => row.tk), { axisLabel: { color: TK.ink2, fontSize: 11 } }),
-    series: [{ type: 'bar', barMaxWidth: 14, data: rows.map(row => ({ value: metric === 'net' ? row.net : row.yield, itemStyle: { color: TK.series[0], opacity: row.months < 6 ? 0.4 : 1, borderRadius: [0, 4, 4, 0] } })),
-      label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => metric === 'net' ? moneyC(param.value) : pct(param.value, 1) } }],
+    series: [{ type: 'bar', barMaxWidth: 14, data: rows.map(row => ({ value: valueOf(row), itemStyle: { color: TK.series[0], opacity: row.months < 6 ? 0.4 : 1, borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => fmt(param.value) } }],
   }), true);
 }
 

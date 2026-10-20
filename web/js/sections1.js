@@ -417,10 +417,17 @@ function renderRank() {
   const chartInst = chart('cRank'); chartInst.resize();
   const fmt = metric === 'gain' ? moneyC : metric === 'eff' ? (value => value.toFixed(1) + '×') : (value => pct(value, 1, true));
   const ref = metric === 'eff' ? 1 : 0;
+  const tip = it => ttHead(`${it.tk} · ${it.name}`) + ttRow(null, L('Anualizado', 'Annualized'), pct(it.st.ann, 2, true)) + ttRow(null, L('Acumulado', 'Cumulative'), pct(it.st.cum, 1, true)) + ttRow(null, L('Ganancia', 'Gain'), money(it.st.gain)) + ttRow(null, L('Peso promedio', 'Average weight'), pct(it.st.wAvg, 1)) + ttRow(null, L('% de las ganancias', '% of gains'), pct(it.st.gainShare, 1)) + ttRow(null, L('Meses', 'Months'), it.st.nm) + CLICK_HINT();
+  const axisFmt = metric === 'gain' ? moneyC : metric === 'eff' ? (value => value + '×') : (value => (value * 100).toFixed(0) + '%');
+  if (FRAME != null) {   // animación en el tiempo: carrera de barras
+    raceBars(chartInst, { rows: rows.map(row => ({ key: row.it.tk, label: row.it.tk, value: row.value, it: row.it, color: row.value >= ref ? TK.pos : TK.neg, opacity: row.it.st.nm < 12 ? 0.4 : 1 })), fmt, axisFmt, ref: metric === 'eff' ? 1 : null, tooltip: row => tip(row.it) });
+    bindInstClicks(chartInst, event => event.componentType === 'series' && event.seriesType === 'custom' ? rows[event.dataIndex].it.tk : null);
+    return;
+  }
   chartInst.setOption(base({
     grid: { left: 8, right: 56, top: 8, bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = rows[rows.length - 1 - param.dataIndex].it; return ttHead(`${it.tk} · ${it.name}`) + ttRow(null, L('Anualizado', 'Annualized'), pct(it.st.ann, 2, true)) + ttRow(null, L('Acumulado', 'Cumulative'), pct(it.st.cum, 1, true)) + ttRow(null, L('Ganancia', 'Gain'), money(it.st.gain)) + ttRow(null, L('Peso promedio', 'Average weight'), pct(it.st.wAvg, 1)) + ttRow(null, L('% de las ganancias', '% of gains'), pct(it.st.gainShare, 1)) + ttRow(null, L('Meses', 'Months'), it.st.nm) + CLICK_HINT(); } }),
-    xAxis: valAxis(metric === 'gain' ? moneyC : metric === 'eff' ? (value => value + '×') : (value => (value * 100).toFixed(0) + '%')),
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => tip(rows[rows.length - 1 - param.dataIndex].it) }),
+    xAxis: valAxis(axisFmt),
     yAxis: catAxis(rows.map(row => row.it.tk).reverse(), { triggerEvent: true, axisLabel: { color: TK.ink2, fontSize: 11 } }),
     series: [{
       type: 'bar', barMaxWidth: 14, cursor: 'pointer',
