@@ -143,3 +143,37 @@ function fitArcLabel(text, ang, R0, R1, size, weight, color) {
   }
   return { show: true, rotate: rot, width: Math.floor(avail), overflow: 'truncate', ellipsis: '…', fontSize: size, fontWeight: weight, color, formatter: () => text };
 }
+
+// Barras horizontales "carrera" para los cuadros de la animación en el tiempo (timeplay.js): cada barra es un
+// elemento con nombre (el ticker), así que al cambiar de mes se desliza a su nuevo lugar en vez de cambiar de
+// renglón. No usa realtimeSort porque ECharts ordena por largo de la barra y aquí hay negativos.
+// rows: [{ key, label, value, color, opacity }] ya ordenadas de arriba hacia abajo.
+function raceBars(chartInst, { rows, fmt, axisFmt, ref = null, tooltip, rowPx = 22 }) {
+  const current = chartInst.getOption();
+  if (!current || !current.series || !current.series[0] || current.series[0].type !== 'custom') chartInst.clear();   // venía de la gráfica normal
+  const capacity = Math.max(rows.length, Math.round((chartInst.getHeight() - 30) / rowPx));
+  const gutter = Math.ceil(Math.max(30, ...rows.map(row => textWidth(row.label, 11, 400)))) + 14;
+  chartInst.setOption(base({
+    grid: { left: gutter, right: 56, top: 8, bottom: 22, containLabel: false },
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => tooltip(rows[param.dataIndex]) }),
+    xAxis: valAxis(axisFmt),
+    yAxis: { type: 'value', inverse: true, min: -0.5, max: capacity - 0.5, show: false },
+    series: [
+      {
+        type: 'custom', cursor: 'pointer', encode: { x: 0, y: 1 },
+        data: rows.map((row, pos) => ({ name: row.key, value: [row.value, pos] })),
+        renderItem: (params, api) => {
+          const row = rows[params.dataIndex], value = api.value(0);
+          const zero = api.coord([0, api.value(1)]), end = api.coord([value, api.value(1)]), height = Math.min(14, api.size([0, 1])[1] * 0.7);
+          const neg = value < 0;
+          return { type: 'group', children: [
+            { type: 'rect', transition: ['shape', 'style'], shape: { x: Math.min(zero[0], end[0]), y: end[1] - height / 2, width: Math.abs(end[0] - zero[0]), height, r: neg ? [4, 0, 0, 4] : [0, 4, 4, 0] }, style: { fill: row.color, opacity: row.opacity ?? 1 } },
+            { type: 'text', transition: ['y'], x: params.coordSys.x - 8, y: end[1], style: { text: row.label, align: 'right', verticalAlign: 'middle', fill: TK.ink2, font: `11px ${FONT}` } },
+            { type: 'text', transition: ['x', 'y'], x: Math.max(zero[0], end[0]) + 4, y: end[1], style: { text: fmt(value), align: 'left', verticalAlign: 'middle', fill: TK.muted, font: `10px ${FONT}` } },   // como la gráfica normal: a la derecha
+          ] };
+        },
+      },
+      { type: 'line', data: [], silent: true, markLine: { symbol: 'none', silent: true, animation: false, lineStyle: { color: TK.axis, type: 'solid' }, label: { show: false }, data: ref != null ? [{ xAxis: ref }] : [] } },
+    ],
+  }));
+}

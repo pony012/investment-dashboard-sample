@@ -271,10 +271,12 @@ function renderSunburst() {
     full.push({ name: valueLabel(level1Value), color: col, value: children.reduce((sum, child) => sum + child.value, 0), children });
   });
   let view = full, focus = null;
-  for (const name of (state.sbPath || [])) { const node = view.find(item => item.name === name); if (!node || !node.children) { state.sbPath = []; view = full; focus = null; break; } focus = node; view = node.children; }
+  // En un mes animado el grupo enfocado puede no existir todavía: se muestra todo sin perder el enfoque elegido
+  let path = state.sbPath || [];
+  for (const name of path) { const node = view.find(item => item.name === name); if (!node || !node.children) { if (FRAME == null) state.sbPath = []; path = []; view = full; focus = null; break; } focus = node; view = node.children; }
   const depth = nodes => nodes.length && nodes[0].children ? 1 + depth(nodes[0].children) : 1;
   const nRings = depth(view);
-  const hole = state.sbPath.length ? 26 : 12;
+  const hole = path.length ? 26 : 12;
   const radii = nRings === 3 ? [hole, 40, 64, 96] : nRings === 2 ? [hole, 58, 96] : [hole, 96];
   const chartInst = chart('cSun');
   const Rpx = Math.min(chartInst.getWidth(), chartInst.getHeight()) / 2;
@@ -289,9 +291,9 @@ function renderSunburst() {
     return nodeOut;
   });
   const data = build(view, 0);
-  document.getElementById('sunHint').textContent = state.sbPath.length ? L(`${[L('Todo', 'All'), ...state.sbPath].join(' › ')} · clic en el centro para regresar`, `${['All', ...state.sbPath].join(' › ')} · click the center to go back`) : L('Anillo interior → medio → instrumento · clic en un segmento para enfocarlo', 'Inner ring → middle → instrument · click a segment to focus it');
+  document.getElementById('sunHint').textContent = path.length ? L(`${[L('Todo', 'All'), ...path].join(' › ')} · clic en el centro para regresar`, `${['All', ...path].join(' › ')} · click the center to go back`) : L('Anillo interior → medio → instrumento · clic en un segmento para enfocarlo', 'Inner ring → middle → instrument · click a segment to focus it');
   const graphic = focus ? [{
-    type: 'group', left: 'center', top: 'middle', onclick: () => { state.sbPath = state.sbPath.slice(0, -1); renderSunburst(); },
+    type: 'group', left: 'center', top: 'middle', onclick: () => { state.sbPath = path.slice(0, -1); renderSunburst(); },
     children: [
       { type: 'circle', shape: { r: hole / 100 * Rpx - 4 }, style: { fill: mix(focus.color, TK.surface, 0.15) }, cursor: 'pointer', left: 'center', top: 'middle' },
       { type: 'text', left: 'center', top: 'middle', cursor: 'pointer', style: { text: `↩\n${focus.name}\n${moneyC(focus.value)}`, fill: inkOn(mix(focus.color, TK.surface, 0.15)), font: `600 11px ${FONT}`, textAlign: 'center', lineHeight: 15, width: 2 * (hole / 100 * Rpx) - 16, overflow: 'truncate' } },
@@ -300,12 +302,12 @@ function renderSunburst() {
   chartInst.off('click');
   chartInst.on('click', event => {
     if (!event.treePathInfo || event.componentType !== 'series') return;
-    const abs = [...state.sbPath, ...event.treePathInfo.slice(1).map(pathItem => pathItem.name)];
+    const abs = [...path, ...event.treePathInfo.slice(1).map(pathItem => pathItem.name)];
     let nodes = full, node = null; for (const name of abs) { node = nodes.find(item => item.name === name); nodes = node && node.children ? node.children : []; }
     if (node && node.children) { state.sbPath = abs; renderSunburst(); }
   });
   chartInst.setOption(base({
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => ttHead([...state.sbPath, ...param.treePathInfo.slice(1).map(pathItem => pathItem.name)].join(' › ')) + ttRow(null, L('Valor', 'Value'), money(param.value)) + ttRow(null, L('Peso en el portafolio', 'Weight in portfolio'), pct(param.value / tot, 1)) + (focus ? ttRow(null, `Peso dentro de ${focus.name}`, pct(param.value / viewTotal, 1)) : '') }),
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => ttHead([...path, ...param.treePathInfo.slice(1).map(pathItem => pathItem.name)].join(' › ')) + ttRow(null, L('Valor', 'Value'), money(param.value)) + ttRow(null, L('Peso en el portafolio', 'Weight in portfolio'), pct(param.value / tot, 1)) + (focus ? ttRow(null, `Peso dentro de ${focus.name}`, pct(param.value / viewTotal, 1)) : '') }),
     graphic,
     series: [{
       type: 'sunburst', data, radius: [hole + '%', '96%'], sort: null, nodeClick: false,
@@ -411,20 +413,27 @@ function renderRank() {
   const rows = model.shown.filter(it => get(it) != null && (metric !== 'eff' || it.st.wAvg > 0.002)).map(it => ({ it, value: get(it) })).sort((left, right) => right.value - left.value);
   document.getElementById('rankHint').textContent = { ann: L('Rendimiento anualizado en el periodo', 'Annualized return in the period'), gain: L('Pesos generados en el periodo', 'Pesos generated in the period'), eff: L('% de las ganancias ÷ peso promedio. >1× = rindió más que su peso', '% of gains ÷ average weight. >1× = returned more than its weight') }[metric];
   document.getElementById('retBasis').textContent = state.incDiv ? L('Incluye dividendos y distribuciones netas de ISR.', 'Includes dividends and distributions net of ISR.') : L('Sólo plusvalías/minusvalías (sin dividendos).', 'Capital gains/losses only (no dividends).');
-  const el = document.getElementById('cRank'); el.style.height = Math.max(300, rows.length * 22 + 40) + 'px';
+  const el = document.getElementById('cRank'); const needH = Math.max(300, rows.length * 22 + 40); el.style.height = (FRAME == null ? needH : Math.max(needH, el.clientHeight)) + 'px';   // al animar sólo crece, para que no brinque
   const chartInst = chart('cRank'); chartInst.resize();
   const fmt = metric === 'gain' ? moneyC : metric === 'eff' ? (value => value.toFixed(1) + '×') : (value => pct(value, 1, true));
   const ref = metric === 'eff' ? 1 : 0;
+  const tip = it => ttHead(`${it.tk} · ${it.name}`) + ttRow(null, L('Anualizado', 'Annualized'), pct(it.st.ann, 2, true)) + ttRow(null, L('Acumulado', 'Cumulative'), pct(it.st.cum, 1, true)) + ttRow(null, L('Ganancia', 'Gain'), money(it.st.gain)) + ttRow(null, L('Peso promedio', 'Average weight'), pct(it.st.wAvg, 1)) + ttRow(null, L('% de las ganancias', '% of gains'), pct(it.st.gainShare, 1)) + ttRow(null, L('Meses', 'Months'), it.st.nm) + CLICK_HINT();
+  const axisFmt = metric === 'gain' ? moneyC : metric === 'eff' ? (value => value + '×') : (value => (value * 100).toFixed(0) + '%');
+  if (FRAME != null) {   // animación en el tiempo: carrera de barras
+    raceBars(chartInst, { rows: rows.map(row => ({ key: row.it.tk, label: row.it.tk, value: row.value, it: row.it, color: row.value >= ref ? TK.pos : TK.neg, opacity: row.it.st.nm < 12 ? 0.4 : 1 })), fmt, axisFmt, ref: metric === 'eff' ? 1 : null, tooltip: row => tip(row.it) });
+    bindInstClicks(chartInst, event => event.componentType === 'series' && event.seriesType === 'custom' ? rows[event.dataIndex].it.tk : null);
+    return;
+  }
   chartInst.setOption(base({
     grid: { left: 8, right: 56, top: 8, bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const it = rows[rows.length - 1 - param.dataIndex].it; return ttHead(`${it.tk} · ${it.name}`) + ttRow(null, L('Anualizado', 'Annualized'), pct(it.st.ann, 2, true)) + ttRow(null, L('Acumulado', 'Cumulative'), pct(it.st.cum, 1, true)) + ttRow(null, L('Ganancia', 'Gain'), money(it.st.gain)) + ttRow(null, L('Peso promedio', 'Average weight'), pct(it.st.wAvg, 1)) + ttRow(null, L('% de las ganancias', '% of gains'), pct(it.st.gainShare, 1)) + ttRow(null, L('Meses', 'Months'), it.st.nm) + CLICK_HINT(); } }),
-    xAxis: valAxis(metric === 'gain' ? moneyC : metric === 'eff' ? (value => value + '×') : (value => (value * 100).toFixed(0) + '%')),
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => tip(rows[rows.length - 1 - param.dataIndex].it) }),
+    xAxis: valAxis(axisFmt),
     yAxis: catAxis(rows.map(row => row.it.tk).reverse(), { triggerEvent: true, axisLabel: { color: TK.ink2, fontSize: 11 } }),
     series: [{
       type: 'bar', barMaxWidth: 14, cursor: 'pointer',
       data: rows.map(row => ({ value: row.value, itemStyle: { color: row.value >= ref ? TK.pos : TK.neg, opacity: row.it.st.nm < 12 ? 0.4 : 1, borderRadius: row.value >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] } })).reverse(),
       label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => fmt(param.value) },
-      markLine: metric === 'eff' ? { symbol: 'none', silent: true, lineStyle: { color: TK.axis, type: 'solid' }, label: { show: false }, data: [{ xAxis: 1 }] } : undefined,
+      markLine: metric === 'eff' ? { symbol: 'none', silent: true, lineStyle: { color: TK.axis, type: 'solid' }, label: { show: false }, data: [{ xAxis: 1 }] } : { data: [] },
     }],
   }), true);
   bindInstClicks(chartInst, event => event.componentType === 'series' ? rows[rows.length - 1 - event.dataIndex].it.tk : null);

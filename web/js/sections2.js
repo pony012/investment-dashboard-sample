@@ -153,7 +153,20 @@ function efficientFrontier(pM) {
   const sameRet = upper.find(mixItem => mixItem.ret >= current.ret - 1e-9) || upper[upper.length - 1];
   return { profiles, mixes, upper, minVar, tangency, current, sameVol, sameRet, means, count };
 }
+// Frontera con `count` puntos repartidos por volatilidad; cada punto toma los pesos de la mezcla real más cercana
+function resampleFrontier(upper, count) {
+  if (upper.length < 2) return upper.map(mix => ({ ...mix }));
+  const lo = upper[0].vol, hi = upper[upper.length - 1].vol;
+  return Array.from({ length: count }, (_, i) => {
+    const vol = lo + (hi - lo) * i / (count - 1);
+    let j = 1; while (j < upper.length - 1 && upper[j].vol < vol) j++;
+    const left = upper[j - 1], right = upper[j], frac = right.vol > left.vol ? Math.min(1, Math.max(0, (vol - left.vol) / (right.vol - left.vol))) : 0;
+    const ret = left.ret + (right.ret - left.ret) * frac, near = frac < 0.5 ? left : right;
+    return { weights: near.weights, vol, ret, sharpe: vol ? (ret - state.rf) / vol : null };
+  });
+}
 function renderFrontier(pM) {
+  pM = pM || profileSeries(model);
   const ef = model.retIdx.length >= 6 ? efficientFrontier(pM) : null;
   if (!ef) { document.getElementById('effKpis').innerHTML = L('<div class="kpi">Se necesitan al menos 6 meses y 2 perfiles de riesgo con inversiones.</div>', '<div class="kpi">At least 6 months and 2 risk profiles with investments are needed.</div>'); document.getElementById('effWhy').innerHTML = ''; chart('cFrontier').clear(); return; }
   const names = ef.profiles.map(profile => profile.name);
@@ -167,16 +180,24 @@ function renderFrontier(pM) {
   ].map(tile => `<div class="kpi"><div class="k">${tile.label}</div><div class="v" style="font-size:20px">${tile.value}</div><div class="d">${tile.detail}</div></div>`).join('');
   const point = (mixItem, name, color, size) => ({ name, type: 'scatter', data: [[mixItem.vol, mixItem.ret]], symbolSize: size, itemStyle: { color, borderColor: TK.surface, borderWidth: 2 }, z: 5, label: { show: true, formatter: name, position: 'right', color: TK.ink, fontSize: 11, fontWeight: 600 } });
   const sample = ef.mixes.filter((_, idx) => idx % 3 === 0);
+  // La frontera se dibuja con un número fijo de puntos (interpolados por volatilidad) para que, al animar en el tiempo,
+  // cada punto se mueva suavemente en vez de que la línea cambie de número de puntos en cada mes
+  const curve = resampleFrontier(ef.upper, 48);
+  // Al animar, ejes fijos con la unión de todos los meses (sin la nube de mezclas, que puede ser muy amplia)
+  const ext = FRAME != null ? frameExtent('cFrontier', mm => { const efAt = mm.retIdx.length >= 6 ? efficientFrontier(profileSeries(mm)) : null; if (!efAt) return null;
+    const pts = [...efAt.upper, efAt.current, efAt.minVar, efAt.tangency]; return { x: [Math.min(...pts.map(mix => mix.vol)), Math.max(...pts.map(mix => mix.vol))], y: [Math.min(...pts.map(mix => mix.ret)), Math.max(...pts.map(mix => mix.ret))] }; }, { step: 0.01 }) : null;
+  // Límites fijos: se ocultan las etiquetas de los extremos, que no caen en múltiplos del intervalo y se enciman
+  const extAxis = axis => ext ? { min: ext[axis][0], max: ext[axis][1], axisLabel: { color: TK.muted, fontSize: 11, formatter: value => (value * 100).toFixed(0) + '%', showMinLabel: false, showMaxLabel: false } } : {};
   chart('cFrontier').setOption(base({
     legend: legend({ data: [L('Mezclas posibles', 'Possible mixes'), L('Frontera eficiente', 'Efficient frontier')] }),
     grid: { left: 8, right: 70, top: legTop(34), bottom: 26, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const mixItem = param.seriesName === L('Frontera eficiente', 'Efficient frontier') ? ef.upper[param.dataIndex] : param.seriesName === L('Mezclas posibles', 'Possible mixes') ? sample[param.dataIndex] : ({ [L('Tú', 'You')]: ef.current, [L('Mín. varianza', 'Min. variance')]: ef.minVar, [L('Máx. Sharpe', 'Max. Sharpe')]: ef.tangency })[param.seriesName];
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const mixItem = param.seriesName === L('Frontera eficiente', 'Efficient frontier') ? curve[param.dataIndex] : param.seriesName === L('Mezclas posibles', 'Possible mixes') ? sample[param.dataIndex] : ({ [L('Tú', 'You')]: ef.current, [L('Mín. varianza', 'Min. variance')]: ef.minVar, [L('Máx. Sharpe', 'Max. Sharpe')]: ef.tangency })[param.seriesName];
       return ttHead(param.seriesName) + ttRow(null, L('Rendimiento anual', 'Annual return'), pct(mixItem.ret, 2)) + ttRow(null, L('Volatilidad', 'Volatility'), pct(mixItem.vol, 2)) + ttRow(null, 'Sharpe', mixItem.sharpe == null ? '—' : mixItem.sharpe.toFixed(2)) + names.map((name, i) => ttRow(colorFor('riesgo', name), valueLabel(name), pct(mixItem.weights[i], 0))).join(''); } }),
-    xAxis: valAxis(value => (value * 100).toFixed(0) + '%', { name: L('Volatilidad', 'Volatility'), nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: TK.muted, fontSize: 11 }, scale: true }),
-    yAxis: valAxis(value => (value * 100).toFixed(0) + '%', { scale: true }),
+    xAxis: valAxis(value => (value * 100).toFixed(0) + '%', { name: L('Volatilidad', 'Volatility'), nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: TK.muted, fontSize: 11 }, scale: true, ...extAxis('x') }),
+    yAxis: valAxis(value => (value * 100).toFixed(0) + '%', { scale: true, ...extAxis('y') }),
     series: [
       { name: L('Mezclas posibles', 'Possible mixes'), type: 'scatter', data: sample.map(mixItem => [mixItem.vol, mixItem.ret]), symbolSize: 3, itemStyle: { color: TK.axis, opacity: 0.6 } },
-      { name: L('Frontera eficiente', 'Efficient frontier'), type: 'line', data: ef.upper.map(mixItem => [mixItem.vol, mixItem.ret]), symbol: 'none', lineStyle: { width: 2.5, color: TK.series[0] }, itemStyle: { color: TK.series[0] } },
+      { name: L('Frontera eficiente', 'Efficient frontier'), type: 'line', data: curve.map(mixItem => [mixItem.vol, mixItem.ret]), smooth: 0.3, symbol: 'none', lineStyle: { width: 2.5, color: TK.series[0] }, itemStyle: { color: TK.series[0] } },
       point(ef.minVar, L('Mín. varianza', 'Min. variance'), TK.series[2], 10), point(ef.tangency, L('Máx. Sharpe', 'Max. Sharpe'), TK.series[3], 12), point(ef.current, L('Tú', 'You'), TK.ink, 14),
     ],
   }), true);
@@ -240,22 +261,7 @@ function renderDividends() {
     ],
   }), true);
 
-  setSeg('divMetric', state.divMetric);
-  const metric = state.divMetric;
-  const rows = gbm.tks.filter(stat => stat.gross > 0 && stat.tk !== 'EFEC' && (metric === 'net' || stat.yield != null)).sort((left, right) => (metric === 'net' ? left.net - right.net : left.yield - right.yield));
-  document.getElementById('divTkHint').textContent = metric === 'net' ? L('Pesos netos de ISR recibidos en el periodo', 'Pesos received net of ISR in the period') : L('Distribuciones netas ÷ valor promedio mientras lo tuviste, anualizado. Atenuados: menos de 6 meses.', 'Net distributions ÷ average value while you held it, annualized. Faded: less than 6 months.');
-  document.getElementById('cDivTk').style.height = Math.max(260, rows.length * 26 + 30) + 'px';
-  chart('cDivTk').resize();
-  charts.cDivTk.setOption(base({
-    grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const stat = rows[param.dataIndex];
-      return ttHead(`${stat.tk} · ${clsOf(stat.tk).nombre}`) + DIST_CATS.filter(cat => stat.cats[cat]).map(cat => ttRow(null, CAT_INFO[cat], money(stat.cats[cat]))).join('') + ttRow(null, L('ISR retenido', 'ISR withheld'), money(stat.isr)) + ttRow(null, L('Neto', 'Net'), money(stat.net)) +
-        ttRow(null, L('Valor promedio', 'Average value'), money(stat.avg)) + ttRow(null, L('Meses invertido', 'Months invested'), stat.months) + ttRow(null, L('Pagos al año', 'Payments per year'), stat.perYear.toFixed(1)) + ttRow(null, L('Yield bruto / neto', 'Gross / net yield'), `${pct(stat.yieldGross, 2)} / ${pct(stat.yield, 2)}`) + (stat.esp ? ttRow(null, L('En especie (ya en el valor)', 'In kind (already in the value)'), money(stat.esp)) : ''); } }),
-    xAxis: valAxis(metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%'),
-    yAxis: catAxis(rows.map(row => row.tk), { axisLabel: { color: TK.ink2, fontSize: 11 } }),
-    series: [{ type: 'bar', barMaxWidth: 14, data: rows.map(row => ({ value: metric === 'net' ? row.net : row.yield, itemStyle: { color: TK.series[0], opacity: row.months < 6 ? 0.4 : 1, borderRadius: [0, 4, 4, 0] } })),
-      label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => metric === 'net' ? moneyC(param.value) : pct(param.value, 1) } }],
-  }), true);
+  renderDivTk();
 
   const calGran = state.calGran, qs = buckets(gbm.idx, calGran);
   setSeg('calGran', calGran);
@@ -349,6 +355,33 @@ function paymentFrequency() {
   }).filter(row => row.count || row.cal || row.held)
     .sort((left, right) => FREQ_ORDER.indexOf(left.freq) - FREQ_ORDER.indexOf(right.freq) || right.net12 - left.net12);
 }
+// Por instrumento: aparte para poder animarlo en el tiempo (timeplay.js)
+function renderDivTk() {
+  const gbm = model.gbm;
+  setSeg('divMetric', state.divMetric);
+  const metric = state.divMetric;
+  const rows = gbm.tks.filter(stat => stat.gross > 0 && stat.tk !== 'EFEC' && (metric === 'net' || stat.yield != null)).sort((left, right) => (metric === 'net' ? left.net - right.net : left.yield - right.yield));
+  document.getElementById('divTkHint').textContent = metric === 'net' ? L('Pesos netos de ISR recibidos en el periodo', 'Pesos received net of ISR in the period') : L('Distribuciones netas ÷ valor promedio mientras lo tuviste, anualizado. Atenuados: menos de 6 meses.', 'Net distributions ÷ average value while you held it, annualized. Faded: less than 6 months.');
+  const divEl = document.getElementById('cDivTk'), needH = Math.max(260, rows.length * 26 + 30); divEl.style.height = (FRAME == null ? needH : Math.max(needH, divEl.clientHeight)) + 'px';   // al animar sólo crece
+  chart('cDivTk').resize();
+  const tip = stat => ttHead(`${stat.tk} · ${clsOf(stat.tk).nombre}`) + DIST_CATS.filter(cat => stat.cats[cat]).map(cat => ttRow(null, CAT_INFO[cat], money(stat.cats[cat]))).join('') + ttRow(null, L('ISR retenido', 'ISR withheld'), money(stat.isr)) + ttRow(null, L('Neto', 'Net'), money(stat.net)) +
+    ttRow(null, L('Valor promedio', 'Average value'), money(stat.avg)) + ttRow(null, L('Meses invertido', 'Months invested'), stat.months) + ttRow(null, L('Pagos al año', 'Payments per year'), stat.perYear.toFixed(1)) + ttRow(null, L('Yield bruto / neto', 'Gross / net yield'), `${pct(stat.yieldGross, 2)} / ${pct(stat.yield, 2)}`) + (stat.esp ? ttRow(null, L('En especie (ya en el valor)', 'In kind (already in the value)'), money(stat.esp)) : '');
+  const valueOf = stat => metric === 'net' ? stat.net : stat.yield, fmt = value => metric === 'net' ? moneyC(value) : pct(value, 1);
+  if (FRAME != null) {   // animación en el tiempo: carrera de barras
+    raceBars(charts.cDivTk, { rows: [...rows].reverse().map(stat => ({ key: stat.tk, label: stat.tk, value: valueOf(stat), stat, color: TK.series[0], opacity: stat.months < 6 ? 0.4 : 1 })), fmt,
+      axisFmt: metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%', tooltip: row => tip(row.stat), rowPx: 26 });
+    return;
+  }
+  charts.cDivTk.setOption(base({
+    grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => tip(rows[param.dataIndex]) }),
+    xAxis: valAxis(metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%'),
+    yAxis: catAxis(rows.map(row => row.tk), { axisLabel: { color: TK.ink2, fontSize: 11 } }),
+    series: [{ type: 'bar', barMaxWidth: 14, data: rows.map(row => ({ value: valueOf(row), itemStyle: { color: TK.series[0], opacity: row.months < 6 ? 0.4 : 1, borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => fmt(param.value) } }],
+  }), true);
+}
+
 function renderFrequency() {
   const rows = paymentFrequency();
   const groups = FREQ_ORDER.map(freq => [freq, rows.filter(row => row.freq === freq)]).filter(([, list]) => list.length);
@@ -697,7 +730,7 @@ function gauss(random) { let uniformA = 0, uniformB = 0; while (!uniformA) unifo
 function fireInputs() {
   const fireState = state.fire, tot = model.V[model.rangeEnd];
   const mixVol = (() => { const pM = profileSeries(model); const stats = seriesStats(mixReturns(pM, Object.fromEntries(pM.map(profile => [profile.name, profile.weight])))); return stats ? stats.vol : null; })();
-  const inputs = { saldo: fireState.saldo ?? Math.round(tot), swr: fireState.swr ?? 0.04, rate: fireState.rate ?? (model.kp.ann ?? 0.08), vol: fireState.vol ?? (mixVol ?? 0.12), gasto: fireState.gasto ?? (state.ret.need ?? 20000), years: fireState.years ?? 50, mixVol };
+  const inputs = { saldo: fireState.saldo ?? Math.round(tot), swr: fireState.swr ?? 0.04, rate: fireState.rate ?? ((model.kp ? model.kp.ann : twr(model.retIdx).ann) ?? 0.08), vol: fireState.vol ?? (mixVol ?? 0.12), gasto: fireState.gasto ?? (state.ret.need ?? 20000), years: fireState.years ?? 50, mixVol };
   inputs.real = (1 + inputs.rate) / (1 + state.inf) - 1;
   return inputs;
 }
@@ -728,6 +761,27 @@ function swrSuccess(real, vol, years, swr, paths = 800, seed = 777) {
     if (alive) ok++; }
   return ok / paths;
 }
+// ¿Qué tasa de retiro aguanta tu portafolio? Aparte para poder animarla en el tiempo (timeplay.js)
+function renderSwr(inputs) {
+  inputs = inputs || fireInputs();
+  const vols = [...new Set([inputs.vol, 0.10, 0.15].map(vol => Math.round(vol * 1000) / 1000))].sort((left, right) => left - right);
+  const xs = []; for (let rate = 0.02; rate <= 0.0701; rate += 0.0025) xs.push(+rate.toFixed(4));
+  const cols = [TK.series[0], TK.series[1], TK.series[4]];
+  const volName = vol => L(`Volatilidad ${pct(vol, 1)}${Math.abs(vol - inputs.vol) < 1e-6 ? L(' (tuya)', ' (yours)') : ''}`, `Volatility ${pct(vol, 1)}${Math.abs(vol - inputs.vol) < 1e-6 ? ' (yours)' : ''}`);
+  document.getElementById('swrHint').textContent = L(`Probabilidad de que el dinero dure ${inputs.years} años retirando cada año el % del saldo inicial (ajustado por inflación), con ${pct(inputs.real, 1)} de rendimiento real esperado.`, `Probability that the money lasts ${inputs.years} years withdrawing each year the % of the starting balance (inflation-adjusted), with ${pct(inputs.real, 1)} expected real return.`);
+  chart('cSwr').setOption(base({
+    legend: legend({ data: vols.map(volName) }),
+    grid: { left: 8, right: 16, top: legTop(34), bottom: 8, containLabel: true },
+    tooltip: Object.assign(base().tooltip, { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: TK.axis } },
+      formatter: ps => ttHead(L(`Retirando ${pct(xs[ps[0].dataIndex], 2)} al año (${money(inputs.saldo * xs[ps[0].dataIndex] / 12)}/mes hoy)`, `Withdrawing ${pct(xs[ps[0].dataIndex], 2)} per year (${money(inputs.saldo * xs[ps[0].dataIndex] / 12)}/month today)`)) + ps.map(param => ttRow(param.color, param.seriesName, pct(param.value, 0))).join('') }),
+    xAxis: catAxis(xs.map(rate => (rate * 100).toFixed(2).replace(/\.?0+$/, '') + '%'), { boundaryGap: false }),
+    yAxis: valAxis(value => (value * 100).toFixed(0) + '%', { max: 1, min: 0 }),
+    series: vols.map((vol, index) => ({ name: volName(vol), type: 'line', data: xs.map(rate => swrSuccess(inputs.real, vol, inputs.years, rate)), symbol: 'circle', symbolSize: 5, showSymbol: false,
+      lineStyle: { width: Math.abs(vol - inputs.vol) < 1e-6 ? 2.5 : 1.5, color: cols[index] }, itemStyle: { color: cols[index] },
+      markLine: index === 0 ? { symbol: 'none', silent: true, lineStyle: { color: TK.axis, width: 1, type: 'solid' }, label: { color: TK.ink2, fontSize: 10, formatter: param => param.name }, data: [{ yAxis: 0.95, name: '95%' }, { yAxis: 0.9, name: '90%' }, { xAxis: xs.reduce((bi, rate, idx) => Math.abs(rate - inputs.swr) < Math.abs(xs[bi] - inputs.swr) ? idx : bi, 0), name: L('tu tasa', 'your rate') }] } : undefined })),
+  }), true);
+}
+
 function renderFire() {
   const inputs = fireInputs();
   const box = document.getElementById('fireCfg');
@@ -786,22 +840,7 @@ function renderFire() {
     ],
   }), true);
 
-  const vols = [...new Set([inputs.vol, 0.10, 0.15].map(vol => Math.round(vol * 1000) / 1000))].sort((left, right) => left - right);
-  const xs = []; for (let rate = 0.02; rate <= 0.0701; rate += 0.0025) xs.push(+rate.toFixed(4));
-  const cols = [TK.series[0], TK.series[1], TK.series[4]];
-  const volName = vol => L(`Volatilidad ${pct(vol, 1)}${Math.abs(vol - inputs.vol) < 1e-6 ? L(' (tuya)', ' (yours)') : ''}`, `Volatility ${pct(vol, 1)}${Math.abs(vol - inputs.vol) < 1e-6 ? ' (yours)' : ''}`);
-  document.getElementById('swrHint').textContent = L(`Probabilidad de que el dinero dure ${inputs.years} años retirando cada año el % del saldo inicial (ajustado por inflación), con ${pct(inputs.real, 1)} de rendimiento real esperado.`, `Probability that the money lasts ${inputs.years} years withdrawing each year the % of the starting balance (inflation-adjusted), with ${pct(inputs.real, 1)} expected real return.`);
-  chart('cSwr').setOption(base({
-    legend: legend({ data: vols.map(volName) }),
-    grid: { left: 8, right: 16, top: legTop(34), bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: TK.axis } },
-      formatter: ps => ttHead(L(`Retirando ${pct(xs[ps[0].dataIndex], 2)} al año (${money(inputs.saldo * xs[ps[0].dataIndex] / 12)}/mes hoy)`, `Withdrawing ${pct(xs[ps[0].dataIndex], 2)} per year (${money(inputs.saldo * xs[ps[0].dataIndex] / 12)}/month today)`)) + ps.map(param => ttRow(param.color, param.seriesName, pct(param.value, 0))).join('') }),
-    xAxis: catAxis(xs.map(rate => (rate * 100).toFixed(2).replace(/\.?0+$/, '') + '%'), { boundaryGap: false }),
-    yAxis: valAxis(value => (value * 100).toFixed(0) + '%', { max: 1, min: 0 }),
-    series: vols.map((vol, index) => ({ name: volName(vol), type: 'line', data: xs.map(rate => swrSuccess(inputs.real, vol, inputs.years, rate)), symbol: 'circle', symbolSize: 5, showSymbol: false,
-      lineStyle: { width: Math.abs(vol - inputs.vol) < 1e-6 ? 2.5 : 1.5, color: cols[index] }, itemStyle: { color: cols[index] },
-      markLine: index === 0 ? { symbol: 'none', silent: true, lineStyle: { color: TK.axis, width: 1, type: 'solid' }, label: { color: TK.ink2, fontSize: 10, formatter: param => param.name }, data: [{ yAxis: 0.95, name: '95%' }, { yAxis: 0.9, name: '90%' }, { xAxis: xs.reduce((bi, rate, idx) => Math.abs(rate - inputs.swr) < Math.abs(xs[bi] - inputs.swr) ? idx : bi, 0), name: L('tu tasa', 'your rate') }] } : undefined })),
-  }), true);
+  renderSwr(inputs);
 
   const realHist = model.kp.ann != null ? (1 + model.kp.ann) / (1 + state.inf) - 1 : null;
   document.getElementById('fireWhy').innerHTML = L(`<h3>¿Es adecuado el 4%?</h3>
