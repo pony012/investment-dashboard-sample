@@ -11,6 +11,7 @@ function renderAll() {
   setSeg('evoMode', state.evoMode);
   renderKPIs(); renderDataQuality(); renderInsights(); renderEvo(); renderGrowth(); renderYears(); renderComp(); renderSunburst(); renderTreemap();
   renderOutliers(); renderRank(); renderScatter(); renderHeat(); renderRisk(); renderDividends(); renderFlows(); renderDetail(); renderInflation(); renderRetirement(); renderFire(); renderTable();
+  syncTimePlayers();
 }
 function rerenderSafe() { try { renderAll(); } catch (err) { console.error(err); toast(L('Error: ', 'Error: ') + err.message); } }
 
@@ -70,7 +71,7 @@ function bind() {
   seg('tmMetric', 'tmMetric', renderTreemap);
   seg('rankMetric', 'rankMetric', renderRank);
   seg('divGran', 'divGran', renderDividends);
-  seg('divMetric', 'divMetric', renderDividends);
+  seg('divMetric', 'divMetric', renderDivTk);
   seg('flowGran', 'flowGran', renderFlows);
   seg('flowBy', 'flowBy', renderFlows, true);
   seg('heatGran', 'heatGran', renderHeat, true);
@@ -229,6 +230,7 @@ setupSections();
 translateStatic();
 setupToc();
 setupAiBox();
+setupTimePlayers();
 applyTheme();
 applyEye();
 bind();

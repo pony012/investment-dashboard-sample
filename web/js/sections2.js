@@ -154,6 +154,7 @@ function efficientFrontier(pM) {
   return { profiles, mixes, upper, minVar, tangency, current, sameVol, sameRet, means, count };
 }
 function renderFrontier(pM) {
+  pM = pM || profileSeries(model);
   const ef = model.retIdx.length >= 6 ? efficientFrontier(pM) : null;
   if (!ef) { document.getElementById('effKpis').innerHTML = L('<div class="kpi">Se necesitan al menos 6 meses y 2 perfiles de riesgo con inversiones.</div>', '<div class="kpi">At least 6 months and 2 risk profiles with investments are needed.</div>'); document.getElementById('effWhy').innerHTML = ''; chart('cFrontier').clear(); return; }
   const names = ef.profiles.map(profile => profile.name);
@@ -240,22 +241,7 @@ function renderDividends() {
     ],
   }), true);
 
-  setSeg('divMetric', state.divMetric);
-  const metric = state.divMetric;
-  const rows = gbm.tks.filter(stat => stat.gross > 0 && stat.tk !== 'EFEC' && (metric === 'net' || stat.yield != null)).sort((left, right) => (metric === 'net' ? left.net - right.net : left.yield - right.yield));
-  document.getElementById('divTkHint').textContent = metric === 'net' ? L('Pesos netos de ISR recibidos en el periodo', 'Pesos received net of ISR in the period') : L('Distribuciones netas ÷ valor promedio mientras lo tuviste, anualizado. Atenuados: menos de 6 meses.', 'Net distributions ÷ average value while you held it, annualized. Faded: less than 6 months.');
-  document.getElementById('cDivTk').style.height = Math.max(260, rows.length * 26 + 30) + 'px';
-  chart('cDivTk').resize();
-  charts.cDivTk.setOption(base({
-    grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
-    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const stat = rows[param.dataIndex];
-      return ttHead(`${stat.tk} · ${clsOf(stat.tk).nombre}`) + DIST_CATS.filter(cat => stat.cats[cat]).map(cat => ttRow(null, CAT_INFO[cat], money(stat.cats[cat]))).join('') + ttRow(null, L('ISR retenido', 'ISR withheld'), money(stat.isr)) + ttRow(null, L('Neto', 'Net'), money(stat.net)) +
-        ttRow(null, L('Valor promedio', 'Average value'), money(stat.avg)) + ttRow(null, L('Meses invertido', 'Months invested'), stat.months) + ttRow(null, L('Pagos al año', 'Payments per year'), stat.perYear.toFixed(1)) + ttRow(null, L('Yield bruto / neto', 'Gross / net yield'), `${pct(stat.yieldGross, 2)} / ${pct(stat.yield, 2)}`) + (stat.esp ? ttRow(null, L('En especie (ya en el valor)', 'In kind (already in the value)'), money(stat.esp)) : ''); } }),
-    xAxis: valAxis(metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%'),
-    yAxis: catAxis(rows.map(row => row.tk), { axisLabel: { color: TK.ink2, fontSize: 11 } }),
-    series: [{ type: 'bar', barMaxWidth: 14, data: rows.map(row => ({ value: metric === 'net' ? row.net : row.yield, itemStyle: { color: TK.series[0], opacity: row.months < 6 ? 0.4 : 1, borderRadius: [0, 4, 4, 0] } })),
-      label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => metric === 'net' ? moneyC(param.value) : pct(param.value, 1) } }],
-  }), true);
+  renderDivTk();
 
   const calGran = state.calGran, qs = buckets(gbm.idx, calGran);
   setSeg('calGran', calGran);
@@ -349,6 +335,27 @@ function paymentFrequency() {
   }).filter(row => row.count || row.cal || row.held)
     .sort((left, right) => FREQ_ORDER.indexOf(left.freq) - FREQ_ORDER.indexOf(right.freq) || right.net12 - left.net12);
 }
+// Por instrumento: aparte para poder animarlo en el tiempo (timeplay.js)
+function renderDivTk() {
+  const gbm = model.gbm;
+  setSeg('divMetric', state.divMetric);
+  const metric = state.divMetric;
+  const rows = gbm.tks.filter(stat => stat.gross > 0 && stat.tk !== 'EFEC' && (metric === 'net' || stat.yield != null)).sort((left, right) => (metric === 'net' ? left.net - right.net : left.yield - right.yield));
+  document.getElementById('divTkHint').textContent = metric === 'net' ? L('Pesos netos de ISR recibidos en el periodo', 'Pesos received net of ISR in the period') : L('Distribuciones netas ÷ valor promedio mientras lo tuviste, anualizado. Atenuados: menos de 6 meses.', 'Net distributions ÷ average value while you held it, annualized. Faded: less than 6 months.');
+  const divEl = document.getElementById('cDivTk'), needH = Math.max(260, rows.length * 26 + 30); divEl.style.height = (FRAME == null ? needH : Math.max(needH, divEl.clientHeight)) + 'px';   // al animar sólo crece
+  chart('cDivTk').resize();
+  charts.cDivTk.setOption(base({
+    grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
+    tooltip: Object.assign(base().tooltip, { trigger: 'item', formatter: param => { const stat = rows[param.dataIndex];
+      return ttHead(`${stat.tk} · ${clsOf(stat.tk).nombre}`) + DIST_CATS.filter(cat => stat.cats[cat]).map(cat => ttRow(null, CAT_INFO[cat], money(stat.cats[cat]))).join('') + ttRow(null, L('ISR retenido', 'ISR withheld'), money(stat.isr)) + ttRow(null, L('Neto', 'Net'), money(stat.net)) +
+        ttRow(null, L('Valor promedio', 'Average value'), money(stat.avg)) + ttRow(null, L('Meses invertido', 'Months invested'), stat.months) + ttRow(null, L('Pagos al año', 'Payments per year'), stat.perYear.toFixed(1)) + ttRow(null, L('Yield bruto / neto', 'Gross / net yield'), `${pct(stat.yieldGross, 2)} / ${pct(stat.yield, 2)}`) + (stat.esp ? ttRow(null, L('En especie (ya en el valor)', 'In kind (already in the value)'), money(stat.esp)) : ''); } }),
+    xAxis: valAxis(metric === 'net' ? moneyC : value => (value * 100).toFixed(0) + '%'),
+    yAxis: catAxis(rows.map(row => row.tk), { axisLabel: { color: TK.ink2, fontSize: 11 } }),
+    series: [{ type: 'bar', barMaxWidth: 14, data: rows.map(row => ({ value: metric === 'net' ? row.net : row.yield, itemStyle: { color: TK.series[0], opacity: row.months < 6 ? 0.4 : 1, borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', color: TK.muted, fontSize: 10, formatter: param => metric === 'net' ? moneyC(param.value) : pct(param.value, 1) } }],
+  }), true);
+}
+
 function renderFrequency() {
   const rows = paymentFrequency();
   const groups = FREQ_ORDER.map(freq => [freq, rows.filter(row => row.freq === freq)]).filter(([, list]) => list.length);

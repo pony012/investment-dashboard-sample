@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import known, paths
 
-JS_ORDER = ['i18n.js', 'core.js', 'helpers.js', 'sections1.js', 'sections2.js', 'ai.js', 'main.js']
+JS_ORDER = ['i18n.js', 'core.js', 'helpers.js', 'sections1.js', 'sections2.js', 'timeplay.js', 'ai.js', 'main.js']
 
 
 def render_html(portfolio, classification, aliases=None, demo=False, lang=None):

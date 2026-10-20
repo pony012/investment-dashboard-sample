@@ -31,6 +31,7 @@ const state = {
   ret: LS.get('ret', {}), fire: LS.get('fire', {}), tv: LS.get('tv', {}), excl: LS.get('excl', []), sort: { col: 'valor', dir: -1 }, ovr: LS.get('cls', {}), divCal: LS.get('divcal', {}), hideOut: LS.get('hideOut', true), outOvr: LS.get('outOvr', {}),
 };
 let model = null;
+let FRAME = null;   // mes que se está dibujando en una animación en el tiempo (timeplay.js); null = periodo completo
 
 function clsOf(tk) {
   if (tk === CASH) return { ...CASH_CLS };
