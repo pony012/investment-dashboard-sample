@@ -195,11 +195,12 @@ section { scroll-margin-top: 64px; }
 .inst-menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 8px; border-radius: 6px; }
 .inst-menu button:hover { background: var(--surface-2); }
 .inst-menu .im-note { font-size: 11.5px; color: var(--muted); padding: 4px 8px 2px; }
-/* Animación en el tiempo (timeplay.js) */
+/* Animación en el tiempo (timeplay.js): todo con ancho fijo para que la barra no cambie de tamaño al moverla */
 .timeplay { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12.5px; color: var(--ink2); }
-.timeplay input[type=range] { flex: 1 1 140px; min-width: 120px; accent-color: var(--ink); }
-.timeplay .tp-play { width: 30px; height: 28px; padding: 0; font-size: 12px; }
-.timeplay .tp-label { font-variant-numeric: tabular-nums; min-width: 118px; }
-.timeplay select, .timeplay .tp-live { font-size: 12px; padding: 3px 8px; }
+.timeplay input[type=range] { flex: 1 1 140px; min-width: 120px; margin: 0; accent-color: var(--ink); }
+.timeplay .tp-play { flex: none; width: 30px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.timeplay .tp-play svg { width: 14px; height: 14px; display: block; }
+.timeplay .tp-label { flex: none; width: 128px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center; }
+.timeplay select, .timeplay .tp-live { font-size: 12px; padding: 3px 8px; white-space: nowrap; }
 .timeplay.past { border-color: var(--ink2); }
-.timeplay.past .tp-label { color: var(--ink); font-weight: 600; }
+.timeplay.past .tp-label { color: var(--ink); }
